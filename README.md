@@ -39,12 +39,20 @@ Nada deste repositório é copiado para o projeto: ele continua sem depender do 
 | Engenharia | Quality gates: blocos de pom e testes prontos no fim de `docs/how-to/enable-quality-gates.md` |
 
 ```bash
-bash scripts/agents/list-pending.sh   # o que falta preencher, por responsável
-bash scripts/git/install-hooks.sh     # hooks de commit (exige repositório Git)
-bash scripts/verify.sh                # agentes, build e testes do app/
+bash scripts/agents/list-pending.sh             # o que falta preencher, por responsável
+bash scripts/git/install-hooks.sh               # hooks de commit (exige repositório Git)
+bash scripts/verify.sh                          # agentes, build e testes do app/
+bash scripts/quality/enable-gates.sh --dry-run  # ativação dos quality gates (--apply com autorização)
+bash scripts/ci.sh                              # ponto de entrada para a CI do time de DevOps
 ```
 
 Até os quality gates serem configurados no `app/pom.xml`, eles aparecem como SKIP com o motivo, e o `verify.sh` termina PARCIAL. É o esperado.
+
+## Atualizar e verificar o instalador
+
+- **Atualizar um projeto:** rode o `install.sh` de novo, a partir de um clone atualizado. O `.harness` é mesclado (o `QUALITY_GATES` do projeto é preservado, e o `KIT_VERSION` passa a ser o do arquivo `VERSION`). Pelo `.kit-manifest`, arquivo ainda idêntico ao instalado é atualizado no lugar, e só o que o projeto alterou recebe a versão nova ao lado, como `<arquivo>.kit`. A saída mostra a versão anterior e a nova.
+- **Verificar o instalador:** `bash selftest.sh` instala num monorepo temporário e confere que só a configuração foi gravada, que ela passa no `check-config` e no harness do projeto e que a reinstalação preserva o `.harness`. Não usa rede, Maven nem Docker.
+- **Sistemas:** Linux e Windows com Git Bash. O macOS precisa das ferramentas GNU (`coreutils`, `gnu-sed`, `findutils`).
 
 ## Origem
 
