@@ -4,19 +4,25 @@
 #   APP_DIR        diretório do projeto Maven relativo à raiz (projetos: "app"; este lab: ".")
 #   APP_ROOT       caminho absoluto de APP_DIR
 #   QUALITY_GATES  required (gate não configurado no pom = FAIL) | optional (= SKIP)
-# Sem .harness: APP_DIR=. e QUALITY_GATES=required. Exige ROOT_DIR definido.
+#   REPOSITORY_ROLE  project (padrão: pom sempre em app/) | reference (repositório de referência)
+# Sem .harness: APP_DIR=., QUALITY_GATES=required, REPOSITORY_ROLE=project. Exige ROOT_DIR definido.
 APP_DIR=.
 QUALITY_GATES=required
+REPOSITORY_ROLE=project
 if [[ -f "${ROOT_DIR}/.harness" ]]; then
   while IFS='=' read -r key value || [[ -n "${key}" ]]; do
     key="${key//[[:space:]]/}"
-    value="${value%%#*}"; value="${value//[[:space:]]/}"
     case "${key}" in
-      ''|'#'*) ;;
-      APP_DIR) APP_DIR="${value}" ;;
-      QUALITY_GATES) QUALITY_GATES="${value}" ;;
-      *) echo "[FAIL] .harness: chave desconhecida '${key}' (válidas: APP_DIR, QUALITY_GATES)." >&2; return 1 ;;
+      ''|'#'*) continue ;;
+      APP_DIR|QUALITY_GATES|REPOSITORY_ROLE) ;;
+      *) echo "[FAIL] .harness: chave desconhecida '${key}' (válidas: APP_DIR, QUALITY_GATES, REPOSITORY_ROLE)." >&2; return 1 ;;
     esac
+    # Comentário ao fim da linha e espaços nas bordas são descartados; espaço interno é inválido.
+    value="${value%%#*}"
+    value="$(sed -E 's/^[[:space:]]+|[[:space:]]+$//g' <<<"${value}")"
+    [[ "${value}" != *[[:space:]]* ]] ||
+      { echo "[FAIL] .harness: valor de ${key} com espaço ('${value}')." >&2; return 1; }
+    printf -v "${key}" '%s' "${value}"
   done < <(tr -d '\r' < "${ROOT_DIR}/.harness")
 fi
 case "${APP_DIR}" in
@@ -25,6 +31,10 @@ esac
 case "${QUALITY_GATES}" in
   required|optional) ;;
   *) echo "[FAIL] .harness: QUALITY_GATES '${QUALITY_GATES}' inválido (required ou optional)." >&2; return 1 ;;
+esac
+case "${REPOSITORY_ROLE}" in
+  project|reference) ;;
+  *) echo "[FAIL] .harness: REPOSITORY_ROLE '${REPOSITORY_ROLE}' inválido (project ou reference)." >&2; return 1 ;;
 esac
 APP_ROOT="$(cd -- "${ROOT_DIR}/${APP_DIR}" 2>/dev/null && pwd -P)" ||
   { echo "[FAIL] .harness: APP_DIR '${APP_DIR}' não existe." >&2; return 1; }

@@ -1,10 +1,10 @@
 # AGENTS.md — Java AI-First Seed
 
-Fonte canônica de instruções para agentes de IA (Codex, Claude Code, Devin e outros); arquivos de provider são apenas adaptadores ([ADR-0002](docs/architecture/adr/0002-multi-provider-agent-context.md)). Carregado em toda sessão: mantenha-o enxuto e mova detalhes para documentos sob demanda.
+Fonte canônica de instruções para agentes de IA (Codex, Claude Code, Devin e outros); arquivos de provider são adaptadores ([ADR-0002](docs/architecture/adr/0002-multi-provider-agent-context.md)). Carregado em toda sessão: mantenha-o enxuto; detalhes vão para documentos sob demanda.
 
 ## 1. Propósito
 
-[PREENCHER: propósito do projeto].
+Propósito: [PREENCHER-NEGÓCIO: o que o sistema faz e para quem, em uma frase]. Requisitos: [PRD](docs/product/prd.md).
 AI-First não significa autonomia irrestrita, ausência de revisão humana ou substituição dos testes.
 
 ## 2. Stack e decisões fundamentais
@@ -35,7 +35,7 @@ Specs de feature: `docs/features/FEAT-XXXX-*/spec.md`; o catálogo lista as exis
 
 ### Skills
 
-Skills canônicas: `.agents/skills/<nome>/SKILL.md`, carregadas sob demanda, inclusive `references/`. Fluxo ordinário: descoberta → especificação → planejamento → TDD → execução → simplificação → verificação → revisão → entrega. Skills detalham procedimentos e não substituem PRD, ADRs ou DoD. Consultar uma skill não autoriza modificar contratos, realizar commits ou publicar alterações. Se uma skill não existir, reporte e use as regras documentais disponíveis.
+Skills canônicas: `.agents/skills/<nome>/SKILL.md` (e `references/`), carregadas sob demanda. Fluxo: descoberta → especificação → planejamento → TDD → execução → simplificação → verificação → revisão → entrega. Skills detalham procedimentos: não substituem PRD, ADRs ou DoD nem autorizam alterar contratos, commitar ou publicar. Skill inexistente: reporte e siga as regras documentais.
 
 | Etapa | Skill | Quando usar |
 |---|---|---|
@@ -106,7 +106,7 @@ Prefira os scripts de `scripts/` a Maven avulso; use Bash (Git Bash no Windows).
 | `setup.sh`, `verify.sh` | Inspecionar ambiente; fluxo padrão (agentes, build, unitários, arquitetura, integração, cobertura) |
 | `build/`, `test/`, `quality/coverage.sh` | Etapas individuais do fluxo padrão |
 | `quality/mutation.sh`, `performance/smoke.sh` | PIT e smoke k6; explícitos, fora do `verify.sh` |
-| `agents/`, `product/` | `check-config.sh`, `sync-skills.sh`, `export-kit.sh`, `init-project.sh`, hooks; `check-prd.sh` |
+| `agents/`, `product/` | `check-config.sh`, `sync-skills.sh`, `list-pending.sh`, `init-project.sh`, hooks; `check-prd.sh` |
 | `git/` | `guard-branch.sh`, `check-commit-msg.sh` e hooks (`install-hooks.sh`) |
 | `security/scan-secrets.sh` | gitleaks; explícito e no `pre-commit` |
 | `harness-tests/` | Testes do próprio harness |

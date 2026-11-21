@@ -38,7 +38,7 @@ Vulnerabilidades são reportadas de forma privada, conforme o [SECURITY.md](SECU
 
 ## Licença
 
-[PREENCHER: licença do projeto e termos das contribuições].
+[PREENCHER-ENGENHARIA: licença do projeto e termos das contribuições].
 
 ## Revisão humana
 

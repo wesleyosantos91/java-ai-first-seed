@@ -1,8 +1,8 @@
 # ADR-0002: Contexto de agentes multi-provider
 
-- **Status:** Proposta (herdada do kit de configuração; revise e aceite)
+- **Status:** Proposta — decidir na seção "Revisão neste projeto"
 - **Data:** 2026-11-20
-- **Responsável pela decisão:** [PREENCHER]
+- **Responsável pela decisão:** ver "Revisão neste projeto"
 - **Substitui:** —
 - **Substituído por:** —
 - **Relacionados:** [ADR-0001](0001-architecture-principles.md), seção AI-First
@@ -57,3 +57,14 @@ Manter cópias independentes por provider cria divergência de regras. O `AGENTS
 ## Revisão da decisão
 
 Revisar quando um provider passar a descobrir `.agents/skills/` nativamente (o adaptador correspondente pode ser removido), quando um novo provider for adotado ou quando o limite de tamanho do `AGENTS.md` se mostrar inadequado.
+
+## Revisão neste projeto
+
+> **Quem preenche:** Engenharia · **Obrigatória** antes da primeira feature. Registre a decisão aqui e no [índice](README.md). Para mudar o conteúdo da decisão, registre um novo ADR que a substitua.
+
+| Campo | Valor |
+|---|---|
+| Decisão | [PREENCHER-ENGENHARIA: Aceita, Rejeitada ou Substituída por ADR-NNNN] |
+| Responsável | [PREENCHER-ENGENHARIA: nome e papel] |
+| Data | [PREENCHER-ENGENHARIA: AAAA-MM-DD] |
+| Ajustes para este projeto | [PREENCHER-ENGENHARIA: diferenças de stack ou de escopo, ou "Nenhum"] |

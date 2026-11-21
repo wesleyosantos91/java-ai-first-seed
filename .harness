@@ -1,5 +1,8 @@
-# Configuração do harness (scripts/lib/app.sh). O projeto Maven fica sempre em app/.
-# QUALITY_GATES=optional: gate não configurado em app/pom.xml é SKIP; required: FAIL.
-# Veja docs/how-to/enable-quality-gates.md.
+# Configuração do harness (scripts/lib/app.sh); chave=valor, sem execução de código.
+# APP_DIR: projeto Maven, sempre app/ (docs/architecture/repository-layout.md).
+# QUALITY_GATES: optional = gate não configurado em app/pom.xml é SKIP; required = FAIL.
+#   Para ativar, veja docs/how-to/enable-quality-gates.md.
+# REPOSITORY_ROLE: project exige APP_DIR=app (verificado por scripts/agents/check-config.sh).
 APP_DIR=app
 QUALITY_GATES=required
+REPOSITORY_ROLE=project

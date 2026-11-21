@@ -141,7 +141,7 @@ if (( ${#docs[@]} > 0 )); then
 fi
 (( link_failures > 0 )) || pass "Links relativos Markdown resolvíveis em ${#docs[@]} arquivo(s)."
 
-# 6b. Marcadores do kit de adoção (scripts/agents/export-kit.sh): só os tipos conhecidos e
+# 6b. Marcadores do kit de adoção (exportador em scripts/agents/): só os tipos conhecidos e
 # blocos omit-start/omit-end balanceados, sem aninhamento.
 marker_failures=0
 if (( ${#docs[@]} > 0 )); then
@@ -163,10 +163,11 @@ fi
 (( marker_failures > 0 )) || pass "Marcadores do kit válidos."
 
 # 6b'. .harness: chaves válidas; em projetos, o pom fica sempre em app/ (docs/architecture/
-# repository-layout.md). Só este repositório de referência (identificado pelo ADR-0004) usa a raiz.
+# repository-layout.md). Só o repositório de referência (REPOSITORY_ROLE=reference) usa outro APP_DIR.
 if harness_error="$(source "${ROOT_DIR}/scripts/lib/app.sh" 2>&1 >/dev/null)"; then
-  harness_dir="$(source "${ROOT_DIR}/scripts/lib/app.sh" && printf '%s' "${APP_DIR}")"
-  if compgen -G 'docs/architecture/adr/0004-*.md' >/dev/null || [[ "${harness_dir}" == app ]]; then
+  harness_dir="$(source "${ROOT_DIR}/scripts/lib/app.sh" && printf '%s %s' "${APP_DIR}" "${REPOSITORY_ROLE}")"
+  harness_role="${harness_dir#* }" harness_dir="${harness_dir%% *}"
+  if [[ "${harness_role}" == reference || "${harness_dir}" == app ]]; then
     pass ".harness válido (APP_DIR=${harness_dir})."
   else
     fail ".harness: APP_DIR=${harness_dir}; em projetos o pom fica em app/ (APP_DIR=app)."
@@ -216,7 +217,7 @@ if [[ "$(git rev-parse --is-inside-work-tree 2>/dev/null)" == true && -z "$(git 
   # Arquivos pessoais que o projeto manda ignorar (.gitignore, "Agentes de IA (arquivos locais)")
   # não são artefatos compartilhados perdidos; somente eles ficam fora desta verificação.
   local_files=(.claude/settings.local.json)
-  ignored="$({ find scripts performance .agents .claude .codex .github .devcontainer -type f 2>/dev/null
+  ignored="$({ find scripts tests/performance .agents .claude .codex .github .devcontainer -type f 2>/dev/null
     printf '%s\n' AGENTS.md CLAUDE.md SECURITY.md .gitleaks.toml .editorconfig .harness; } |
     { grep -vxF -f <(printf '%s\n' "${local_files[@]}") || true; } |
     git check-ignore --stdin 2>/dev/null || true)"
