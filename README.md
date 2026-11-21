@@ -47,7 +47,7 @@ Detalhes e regras por diretório: [layout do repositório](docs/architecture/rep
 
 ## Origem
 
-Este repositório é gerado por `scripts/agents/export-kit.sh --seed` a partir do repositório de referência [java-ai-engineering-lab](https://github.com/wesleyosantos91/java-ai-engineering-lab). Correções no chassi devem ser feitas lá e regeneradas aqui.
+Este template é gerado pelo exportador do kit (modo `--seed`) do repositório de referência [java-ai-engineering-lab](https://github.com/wesleyosantos91/java-ai-engineering-lab). Correções no chassi são feitas lá e chegam aqui por regeneração. O projeto criado pelo `init-project.sh` não depende deste template nem do repositório de referência.
 
 ## Licença
 

@@ -3,7 +3,7 @@
 
 ## Status
 
-Proposta (herdada do kit de configuração; revise e aceite)
+Proposta — decidir na seção "Revisão neste projeto"
 
 ## Contexto
 
@@ -90,3 +90,14 @@ As decisões serão verificadas por revisão de código, testes automatizados, t
 ## Revisão da decisão
 
 Este ADR deverá ser revisado quando novas evidências justificarem alterações. Mudanças relevantes deverão ser documentadas em novos ADRs, preservando o histórico.
+
+## Revisão neste projeto
+
+> **Quem preenche:** Engenharia · **Obrigatória** antes da primeira feature. Registre a decisão aqui e no [índice](README.md). Para mudar o conteúdo da decisão, registre um novo ADR que a substitua.
+
+| Campo | Valor |
+|---|---|
+| Decisão | [PREENCHER-ENGENHARIA: Aceita, Rejeitada ou Substituída por ADR-NNNN] |
+| Responsável | [PREENCHER-ENGENHARIA: nome e papel] |
+| Data | [PREENCHER-ENGENHARIA: AAAA-MM-DD] |
+| Ajustes para este projeto | [PREENCHER-ENGENHARIA: diferenças de stack ou de escopo, ou "Nenhum"] |

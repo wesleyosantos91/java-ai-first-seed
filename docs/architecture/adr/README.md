@@ -6,9 +6,9 @@ Registro versionado das decisões arquiteturais do Java AI-First Seed. Cada ADR 
 
 | ADR | Título | Status | Data |
 |---|---|---|---|
-| [0001](0001-architecture-principles.md) | Princípios de arquitetura | Proposta (herdada do kit) | — |
-| [0002](0002-multi-provider-agent-context.md) | Contexto de agentes multi-provider | Proposta (herdada do kit) | — |
-| [0003](0003-test-suites-and-quality-gates.md) | Suítes de teste e quality gates | Proposta (herdada do kit) | — |
+| [0001](0001-architecture-principles.md) | Princípios de arquitetura | Proposta (revisar) | — |
+| [0002](0002-multi-provider-agent-context.md) | Contexto de agentes multi-provider | Proposta (revisar) | — |
+| [0003](0003-test-suites-and-quality-gates.md) | Suítes de teste e quality gates | Proposta (revisar) | — |
 
 ## Quando registrar um ADR
 
