@@ -1,54 +1,55 @@
 # Java AI-First Seed
 
-Chassi de contexto para projetos Java desenvolvidos com agentes de IA (Codex, Claude Code, Devin). Não contém regra de negócio: traz as instruções dos agentes, as skills, o harness de verificação, os quality gates e um PRD guiado para o time de negócio preencher.
+Instalador da configuração AI-First para monorepos Java com agentes de IA (Codex, Claude Code, Devin): instruções e skills dos agentes, harness de verificação, quality gates, PRD guiado e ADRs propostos.
 
-## Estrutura
+Ele **não cria projeto**. Você aponta o diretório de um monorepo que já existe, com o projeto Maven em `app/`, e o instalador adiciona só a configuração na raiz.
 
-| Diretório | Conteúdo |
+## Uso
+
+```bash
+git clone https://github.com/wesleyosantos91/java-ai-first-seed.git
+bash java-ai-first-seed/install.sh /caminho/do/monorepo
+```
+
+O instalador:
+
+- **detecta** em `app/` (só leitura) a classe `@SpringBootApplication`, o pacote, o Java, o Spring Boot, os starters e o nome do projeto;
+- **grava só configuração na raiz:** `AGENTS.md`, `CLAUDE.md`, `.agents/`, `.claude/`, `.codex/`, `docs/`, `scripts/`, `.harness` e arquivos de editor e Git;
+- **não altera** `app/`, `infra/`, `tests/`, `.github/` nem o `README.md` do projeto. Se um arquivo de configuração já existe e é diferente, a versão do kit fica ao lado como `<arquivo>.kit`;
+- verifica tudo numa área temporária antes de gravar. Se algo falhar, o projeto não é alterado.
+
+Nada deste repositório é copiado para o projeto: ele continua sem depender do seed.
+
+## Estrutura esperada do projeto
+
+```text
+<monorepo>/
+├── app/        projeto Maven (app/pom.xml), obrigatório
+├── infra/      infraestrutura (por exemplo, Terraform), opcional
+├── tests/      testes fora do app, opcional
+└── .github/    CI do time de DevOps, opcional
+```
+
+## Depois de instalar
+
+| Quem | O quê |
 |---|---|
-| Raiz: [AGENTS.md](AGENTS.md), `.agents/`, `.claude/`, `.codex/`, `docs/`, `scripts/`, `.harness` | Configuração AI-First, que vale para o repositório inteiro |
-| `app/` | Projeto Maven: Spring Boot 4, Java 27, Spring JDBC, PostgreSQL, Flyway, Testcontainers; sem endpoints |
-| `infra/` | Infraestrutura como código e configuração de ambiente |
-| `tests/` | Testes fora do app (smoke k6 em `tests/performance/k6/`) |
-| `.github/` | Não vem no seed: workflows, CODEOWNERS e templates são configurados pelo time de DevOps, e agentes não os alteram |
+| Negócio | PRD em `docs/product/prd.md` (cada seção diz quem preenche) e propósito no `AGENTS.md` §1 |
+| Engenharia | Seção "Revisão neste projeto" dos ADRs 0001 a 0003, persistência no `AGENTS.md` §2 e licença no `CONTRIBUTING.md` |
+| Engenharia | Quality gates: blocos de pom e testes prontos no fim de `docs/how-to/enable-quality-gates.md` |
 
-Detalhes e regras por diretório: [layout do repositório](docs/architecture/repository-layout.md).
+```bash
+bash scripts/agents/list-pending.sh   # o que falta preencher, por responsável
+bash scripts/git/install-hooks.sh     # hooks de commit (exige repositório Git)
+bash scripts/verify.sh                # agentes, build e testes do app/
+```
 
-## Como começar
-
-1. **Criar o repositório:** botão *Use this template* no GitHub e clone do novo repositório.
-2. **Dar nome ao projeto** (pacote, classe principal, identidade Maven em `app/pom.xml` e este README):
-
-   ```bash
-   bash scripts/agents/init-project.sh --base-package com.acme.orders \
-     --main-class OrdersApplication --project-name "Orders Service"
-   ```
-
-3. **Time de negócio: preencher o PRD** em [docs/product/prd.md](docs/product/prd.md). Cada seção diz quem a preenche (`Negócio`, `Engenharia` ou `Ambos`) e se é obrigatória; os campos pendentes aparecem como `[PREENCHER-NEGÓCIO: ...]` e `[PREENCHER-ENGENHARIA: ...]`. Para ver o que falta, por responsável:
-
-   ```bash
-   bash scripts/product/check-prd.sh
-   ```
-
-   O PRD só pode ser marcado como **Aprovado** sem pendências; a verificação dos agentes falha caso contrário.
-
-4. **Engenharia:** complete as seções técnicas do PRD, ajuste o `AGENTS.md` (§1 propósito, §2 stack), revise os ADRs herdados e a licença.
-5. **Ativar o harness:**
-
-   ```bash
-   bash scripts/git/install-hooks.sh
-   bash scripts/setup.sh
-   bash scripts/verify.sh
-   ```
-
-   Sem código de negócio, unitários e cobertura retornam SKIP e o resultado é PARCIAL. É o esperado até a primeira feature.
-
-6. **Primeira feature:** com o PRD aprovado, peça ao agente a skill `feature-delivery`.
+Até os quality gates serem configurados no `app/pom.xml`, eles aparecem como SKIP com o motivo, e o `verify.sh` termina PARCIAL. É o esperado.
 
 ## Origem
 
-Este template é gerado pelo exportador do kit (modo `--seed`) do repositório de referência [java-ai-engineering-lab](https://github.com/wesleyosantos91/java-ai-engineering-lab). Correções no chassi são feitas lá e chegam aqui por regeneração. O projeto criado pelo `init-project.sh` não depende deste template nem do repositório de referência.
+Gerado pelo exportador do kit (`--seed`) do repositório de referência [java-ai-engineering-lab](https://github.com/wesleyosantos91/java-ai-engineering-lab). Correções são feitas lá e chegam aqui por regeneração.
 
 ## Licença
 
-[Apache License 2.0](LICENSE). Projetos criados a partir deste template escolhem a própria licença.
+[Apache License 2.0](LICENSE).
