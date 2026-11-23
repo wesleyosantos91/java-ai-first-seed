@@ -20,19 +20,24 @@ pom_has 'pitest-maven' && pom_has '<app.basePath>' ||
 BASE_PATH="$(pom_property app.basePath)" || exit 1
 FEATURE_DIR="${APP_ROOT}/src/main/java/${BASE_PATH}/feature"
 
-# Mesmo escopo de targetClasses do pitest-maven: feature/*/domain e feature/*/service.
-if [[ ! -d "${FEATURE_DIR}" ]] ||
-   ! find "${FEATURE_DIR}" -type f -name '*.java' ! -name 'package-info.java' \
-     \( -path '*/domain/*' -o -path '*/service/*' \) -print -quit | grep -q .; then
-  echo "[SKIP] Mutação: não existe código de negócio elegível (feature/*/domain ou feature/*/service)."
-  exit 3
+# Escopo padrão do kit (targetClasses feature.*.domain/service, arquitetura Feature-Based): sem esse
+# código, SKIP sem chamar o Maven. Projeto com outra arquitetura ajusta targetClasses no pom (mesmo
+# threshold, com aprovação); aí o PIT decide a elegibilidade (nenhum mutante = SKIP).
+if pom_has '.feature.*.domain.*'; then
+  if [[ ! -d "${FEATURE_DIR}" ]] ||
+     ! find "${FEATURE_DIR}" -type f -name '*.java' ! -name 'package-info.java' \
+       \( -path '*/domain/*' -o -path '*/service/*' \) -print -quit | grep -q .; then
+    echo "[SKIP] Mutação: não existe código de negócio elegível (feature/*/domain ou feature/*/service)."
+    echo "       Arquitetura não Feature-Based: ajuste <targetClasses> do pitest-maven aos packages de negócio (mantenha o threshold; exige aprovação)."
+    exit 3
+  fi
 fi
 
 rm -rf "${REPORT_DIR}"
 cd "${APP_ROOT}"
 echo "[INFO] Mutação: executando PIT; meta mutation score >= 90%."
 code=0
-bash ./mvnw --batch-mode --no-transfer-progress \
+run_maven --batch-mode --no-transfer-progress \
   test-compile org.pitest:pitest-maven:mutationCoverage || code=$?
 
 report="${REPORT_DIR}/mutations.xml"

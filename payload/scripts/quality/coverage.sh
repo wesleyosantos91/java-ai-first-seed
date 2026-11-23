@@ -42,7 +42,7 @@ rm -f "${TARGET}/jacoco-merged.exec" "${REPORT}"
 cd "${APP_ROOT}"
 echo "[INFO] Cobertura: dados ${exec_files[*]}; metas LINE >= 90% e BRANCH >= 90%."
 code=0
-bash ./mvnw --batch-mode --no-transfer-progress \
+run_maven --batch-mode --no-transfer-progress \
   jacoco:merge@coverage-merge jacoco:report@coverage-report jacoco:check@coverage-check || code=$?
 
 [[ -f "${REPORT}" ]] || {

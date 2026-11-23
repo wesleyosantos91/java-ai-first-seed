@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# Fluxo padrão de verificação local: agentes e thresholds, build, unitários, arquitetura,
+# integração e cobertura. Resumo em <APP_DIR>/target/harness/verify-summary.json.
+# Retornos: 0 = PASS (ou PARCIAL com QUALITY_GATES=optional, com aviso); 3 = PARCIAL (alguma
+#           etapa SKIP) com QUALITY_GATES=required; demais = FAIL (código da etapa que falhou).
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 ROOT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd -P)"
 
@@ -17,6 +22,7 @@ source "${SCRIPT_DIR}/lib/summary.sh"
 # Resumo legível por máquina (CI e agentes); docs/how-to/ci-integration.md.
 VERIFY_SUMMARY="${APP_ROOT}/target/harness/verify-summary.json"
 summary() {
+  SUMMARY_EXIT_CODE=$?
   echo "[RESUMO] Agentes=${agents}; Build=${build}; Unitários=${unit}; Arquitetura=${architecture}; Integração=${integration}; Cobertura=${coverage}; Mutação=NOT RUN"
   echo "[NOT RUN] Mutação (PIT) exige execução explícita: bash scripts/quality/mutation.sh."
   write_summary "${VERIFY_SUMMARY}" \
@@ -47,9 +53,13 @@ run_step() {
 }
 
 # Guard de branch não é parte da verificação: revisões e spikes podem usar HEAD destacado.
-echo "[1/6] Configuração de agentes"
+echo "[1/6] Configuração de agentes e limites de qualidade"
 agents=FAIL
 bash "${SCRIPT_DIR}/agents/check-config.sh"
+# Thresholds aprovados (ADR-0003) não podem ser reduzidos no pom; gate ainda não configurado = 3.
+thresholds=0
+bash "${SCRIPT_DIR}/quality/check-thresholds.sh" || thresholds=$?
+(( thresholds == 0 || thresholds == 3 )) || exit "${thresholds}"
 agents=PASS
 
 echo "[2/6] Build"
@@ -77,6 +87,12 @@ fi
 
 if [[ "${unit}" == SKIP || "${architecture}" == SKIP || "${integration}" == SKIP || "${coverage}" == SKIP ]]; then
   echo "[PARCIAL] Há verificações omitidas; SKIP não equivale a PASS."
+  # Contrato de saída (docs/how-to/ci-integration.md): com gates obrigatórios, PARCIAL não é sucesso.
+  if [[ "${QUALITY_GATES}" == required ]]; then
+    echo "[PARCIAL] QUALITY_GATES=required: resultado PARCIAL termina com exit 3."
+    exit 3
+  fi
+  echo "[AVISO] QUALITY_GATES=optional: PARCIAL termina com exit 0 (adoção gradual); o resumo JSON registra PARCIAL."
 else
   echo "[PASS] Fluxo padrão aprovado: configuração de agentes, build, unitários, arquitetura, integração e cobertura."
   echo "[PARCIAL] Quality gates completos exigem também a mutação (NOT RUN neste fluxo)."

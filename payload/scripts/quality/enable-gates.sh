@@ -38,9 +38,6 @@ grep -q '^## Blocos prontos para este projeto' "${GUIDE}" 2>/dev/null || {
   echo "[FAIL] Seção \"Blocos prontos para este projeto\" ausente em docs/how-to/enable-quality-gates.md (gerada pelo instalador do kit)." >&2
   exit 1
 }
-for tag in '</properties>' '</dependencies>' '</project>'; do
-  grep -qF "${tag}" "${POM}" || { echo "[FAIL] ${APP_PREFIX}pom.xml sem ${tag}; adicione a seção vazia e repita." >&2; exit 1; }
-done
 
 # 1. Extrai os blocos do guia: 3 blocos XML (propriedades, dependências, plugins), as classes de
 #    teste rotuladas (`caminho.java`:) e o teste de contexto sem banco (bloco Java sem rótulo).
@@ -95,6 +92,86 @@ for rel in "${!classes[@]}"; do
   [[ ! -e "${test_dir}/${rel}" ]] || { echo "[FAIL] ${APP_PREFIX}src/test/java/${package//.//}/${rel} já existe; nada foi gravado." >&2; exit 1; }
 done
 
+# 3b. Preflight estrutural do pom (nada é gravado se falhar). Os pontos de inserção são localizados
+#     pela pilha de elementos, fora de comentários: project/properties, project/dependencies e
+#     project/build/plugins, nunca dentro de dependencyManagement, pluginManagement ou profiles.
+# element_lines <pom> <caminho>: "abertura fechamento ocorrências autofechado" (números de linha).
+element_lines() {
+  awk -v want="$2" '
+    function path(   p, k) { p = st[1]; for (k = 2; k <= d; k++) p = p "/" st[k]; return p }
+    {
+      line = carry $0; carry = ""; out = ""
+      while (length(line)) {
+        if (incom) { e = index(line, "-->"); if (!e) { line = ""; break }; line = substr(line, e + 3); incom = 0; continue }
+        s = index(line, "<!--"); if (!s) { out = out line; break }
+        out = out substr(line, 1, s - 1); line = substr(line, s + 4); incom = 1
+      }
+      line = out
+      while (match(line, /<[^>]*>/)) {
+        t = substr(line, RSTART + 1, RLENGTH - 2); line = substr(line, RSTART + RLENGTH)
+        if (t ~ /^[?!]/) continue
+        if (t ~ /^\//) { if (path() == want) { cl = NR; n++ }; d--; continue }
+        self = (t ~ /\/$/); name = t; sub(/[[:space:]\/].*$/, "", name)
+        d++; st[d] = name
+        if (path() == want) { if (self) { selfc = NR; n++ } else op = NR }
+        if (self) d--
+      }
+      s = index(line, "<"); if (s) carry = substr(line, s) " "
+    }
+    END { printf "%d %d %d %d\n", op, cl, n, selfc }' "$1"
+}
+structural=()
+check_target() {  # <caminho> <obrigatório 0|1>: 0 = utilizável, 1 = ausente (permitido)
+  local open close n self found
+  found="$(element_lines "${POM}" "$1")" || { echo "[FAIL] Leitura estrutural de ${APP_PREFIX}pom.xml falhou." >&2; exit 1; }
+  read -r open close n self <<<"${found}"
+  if (( n == 0 )); then
+    (( $2 )) && structural+=("<${1##*/}> ausente em ${1%/*} (adicione a seção vazia e repita)")
+    return 1
+  fi
+  if (( n > 1 )); then structural+=("<${1##*/}> declarado ${n} vezes em ${1%/*}"); return 0; fi
+  if (( self > 0 )); then structural+=("<${1##*/}/> autofechado (linha ${self}); troque por <${1##*/}></${1##*/}>"); return 0; fi
+  (( open != close )) || structural+=("<${1##*/}> abre e fecha na mesma linha (${open}); separe as tags")
+  return 0
+}
+source "${SCRIPT_DIR}/../lib/detect.sh"
+detect_stack "${APP_ROOT}"
+[[ "${DETECT_PACKAGING}" != pom ]] ||
+  structural+=("projeto multimódulo (packaging pom; módulos: ${DETECT_MODULES:-?}): configure os gates no módulo da aplicação manualmente (docs/how-to/enable-quality-gates.md)")
+check_target project/properties 1 || true
+check_target project/dependencies 1 || true
+if check_target project/build/plugins 0; then plugins_target=project/build/plugins
+elif check_target project/build 0; then plugins_target=project/build
+else plugins_target=project; fi
+leaves="$(pom_leaves "${POM}")"
+# Plugins do kit já declarados pelo projeto em build/plugins: nunca duplicar (mescla manual).
+for plugin in maven-surefire-plugin maven-failsafe-plugin jacoco-maven-plugin pitest-maven maven-dependency-plugin; do
+  awk -F '\t' -v p="${plugin}" '$1 == "project/build/plugins/plugin/artifactId" && $2 == p { found = 1 } END { exit !found }' <<<"${leaves}" &&
+    structural+=("plugin ${plugin} já declarado em build/plugins: mescle manualmente o bloco 3 do guia")
+done
+# Propriedades do bloco já definidas pelo projeto: nunca sobrescrever.
+while IFS= read -r prop; do
+  [[ -n "${prop}" ]] || continue
+  awk -F '\t' -v p="project/properties/${prop}" '$1 == p { found = 1 } END { exit !found }' <<<"${leaves}" &&
+    structural+=("propriedade <${prop}> já definida no pom: mescle manualmente o bloco 1 do guia")
+done < <(sed -n 's#^[[:space:]]*<\([A-Za-z0-9_.-]*\)[ />].*#\1#p' "${BLOCKS}/xml-1")
+if (( ${#structural[@]} > 0 )); then
+  printf '  - %s\n' "${structural[@]}" >&2
+  echo "[FAIL] ${APP_PREFIX}pom.xml não pode receber os blocos automaticamente; nada foi gravado. Aplique-os à mão seguindo docs/how-to/enable-quality-gates.md." >&2
+  exit 1
+fi
+# Dependências de teste que o projeto já declara: omitidas do bloco (sem duplicar).
+existing_deps="$(awk -F '\t' '$1 == "project/dependencies/dependency/artifactId" { print $2 }' <<<"${leaves}")"
+awk -v existing="${existing_deps//$'\n'/ }" '
+  BEGIN { n = split(existing, e, " "); for (i = 1; i <= n; i++) have[e[i]] = 1 }
+  /<dependency>/ { block = ""; on = 1; id = "" }
+  on { block = block $0 "\n"; if ($0 ~ /<artifactId>/) { id = $0; gsub(/.*<artifactId>|<\/artifactId>.*/, "", id) } }
+  /<\/dependency>/ && on { if (!(id in have)) printf "%s", block; on = 0 }' "${BLOCKS}/xml-2" > "${BLOCKS}/xml-2.dedup"
+mv "${BLOCKS}/xml-2.dedup" "${BLOCKS}/xml-2"
+if [[ "${DETECT_PARENT}" != org.springframework.boot:spring-boot-starter-parent:* ]]; then
+  echo "[AVISO] Parent não é o spring-boot-starter-parent (${DETECT_PARENT:-sem parent}): versões de surefire, failsafe e dependency-plugin precisam vir do seu parent ou BOM; confira com bash scripts/agents/detect-stack.sh --effective."
+fi
+
 echo "[INFO] Quality gates para ${package}.${main} ($([[ ${database} == 1 ]] && echo 'com banco: Testcontainers' || echo 'sem banco: teste de contexto')):"
 echo "  - ${APP_PREFIX}pom.xml: $(wc -l < "${BLOCKS}/xml-1" | tr -d ' ') linha(s) de propriedades, $(grep -c '<dependency>' "${BLOCKS}/xml-2") dependência(s) de teste, $(grep -c '^			<plugin>' "${BLOCKS}/xml-3") plugin(s)"
 for rel in $(printf '%s\n' "${!classes[@]}" | sort); do echo "  - criar ${APP_PREFIX}src/test/java/${package//.//}/${rel}"; done
@@ -113,27 +190,48 @@ git -C "${ROOT_DIR}" rev-parse --is-inside-work-tree >/dev/null 2>&1 ||
 if [[ -n "$(git -C "${ROOT_DIR}" status --porcelain -- "${APP_DIR}" .harness)" ]]; then
   echo "[FAIL] ${APP_DIR}/ ou .harness com alterações não commitadas; faça commit antes de aplicar." >&2; exit 1
 fi
-insert_before() {  # <arquivo> <marcador> <bloco>: insere o bloco antes da primeira ocorrência
-  awk -v marker="$2" -v block="$3" '
+insert_at() {  # <arquivo> <linha> <bloco>: insere o bloco antes da linha indicada
+  awk -v at="$2" -v block="$3" '
     BEGIN { while ((getline line < block) > 0) text = text line "\n" }
-    !done && index($0, marker) { printf "%s", text; done = 1 }
+    NR == at { printf "%s", text }
     { print }' "$1" > "$1.tmp" && mv "$1.tmp" "$1"
 }
-insert_before "${POM}" '</properties>' "${BLOCKS}/xml-1"
-insert_before "${POM}" '</dependencies>' "${BLOCKS}/xml-2"
-# Sem <plugins>, a seção é criada (dentro de <build>, ou um <build> novo antes de </project>).
-if grep -qF '</plugins>' "${POM}"; then
-  insert_before "${POM}" '</plugins>' "${BLOCKS}/xml-3"
+# Insere antes do fechamento do elemento <caminho> (já validado no preflight, seção 3b).
+insert_into() {
+  local path="$1" block="$2" open close n self
+  read -r open close n self <<<"$(element_lines "${POM}" "${path}")"
+  insert_at "${POM}" "${close}" "${block}"
+}
+cp -p "${POM}" "${BLOCKS}/pom.before"
+insert_into project/properties "${BLOCKS}/xml-1"
+insert_into project/dependencies "${BLOCKS}/xml-2"
+# Sem project/build/plugins, a seção é criada (dentro de <build>, ou um <build> novo).
+case "${plugins_target}" in
+  project/build/plugins) insert_into project/build/plugins "${BLOCKS}/xml-3" ;;
+  project/build)
+    { printf '\t\t<plugins>\n'; cat "${BLOCKS}/xml-3"; printf '\t\t</plugins>\n'; } > "${BLOCKS}/plugins-wrapped"
+    insert_into project/build "${BLOCKS}/plugins-wrapped" ;;
+  project)
+    { printf '\t<build>\n\t\t<plugins>\n'; cat "${BLOCKS}/xml-3"; printf '\t\t</plugins>\n\t</build>\n'; } > "${BLOCKS}/plugins-wrapped"
+    insert_into project "${BLOCKS}/plugins-wrapped" ;;
+esac
+# XML bem formado depois da inserção (python ou xmllint, se houver); senão, restaura o pom.
+xml_ok=unknown
+if command -v xmllint >/dev/null 2>&1; then
+  xmllint --noout "${POM}" 2>/dev/null && xml_ok=yes || xml_ok=no
 else
-  wrapped="${BLOCKS}/plugins-wrapped"
-  if grep -qF '</build>' "${POM}"; then
-    { printf '\t\t<plugins>\n'; cat "${BLOCKS}/xml-3"; printf '\t\t</plugins>\n'; } > "${wrapped}"
-    insert_before "${POM}" '</build>' "${wrapped}"
-  else
-    { printf '\t<build>\n\t\t<plugins>\n'; cat "${BLOCKS}/xml-3"; printf '\t\t</plugins>\n\t</build>\n'; } > "${wrapped}"
-    insert_before "${POM}" '</project>' "${wrapped}"
-  fi
+  for interpreter in python3 python; do
+    command -v "${interpreter}" >/dev/null 2>&1 || continue
+    "${interpreter}" -c 'import sys, xml.dom.minidom; xml.dom.minidom.parse(sys.argv[1])' "${POM}" 2>/dev/null && xml_ok=yes || xml_ok=no
+    break
+  done
 fi
+if [[ "${xml_ok}" == no ]]; then
+  cp -p "${BLOCKS}/pom.before" "${POM}"
+  echo "[FAIL] ${APP_PREFIX}pom.xml ficaria mal formado após a inserção; restaurado, nada foi gravado." >&2
+  exit 1
+fi
+[[ "${xml_ok}" == yes ]] || echo "[AVISO] Sem xmllint, python3 ou python: boa formação do pom NÃO VERIFICADA; confira com git diff e bash scripts/verify.sh."
 for rel in "${!classes[@]}"; do
   mkdir -p "$(dirname -- "${test_dir}/${rel}")"
   cp "${classes[${rel}]}" "${test_dir}/${rel}"

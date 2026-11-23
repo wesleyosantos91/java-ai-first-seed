@@ -37,7 +37,8 @@ Este ADR registra retroativamente decisões já implementadas. Ele não introduz
 
 - Os scripts retornam `0` PASS, `3` SKIP e `1` FAIL.
 - A ausência de classes, código, branches ou mutantes elegíveis é SKIP, nunca PASS.
-- `verify.sh` com SKIP termina com resultado PARCIAL.
+- `verify.sh` com SKIP termina com resultado PARCIAL: exit `3` com `QUALITY_GATES=required` e exit `0` com aviso com `optional` (adoção gradual); o mesmo vale para `ci.sh` ([contrato](../../how-to/ci-integration.md)).
+- Os limites (JaCoCo LINE e BRANCH ≥ 0.90, PIT ≥ 90) são protegidos por `scripts/quality/check-thresholds.sh`, executado pelo `verify.sh`; reduzi-los exige novo ADR.
 - **Exceção, somente para ArchUnit:** uma regra cuja pré-condição estrutural não existe (por exemplo, ciclos entre features com uma única feature, ou producers sem código de mensageria) é **N/A** (não aplicável), marcada por `[N/A]` na premissa do teste. N/A não conta como SKIP, mas aparece no resumo. A arquitetura só é PASS se nenhuma regra aplicável falhar e **ao menos uma regra executar**; com todas as regras N/A, o resultado é SKIP. A suposição de uma regra ser trivialmente verdadeira fica explícita no relatório, sem tornar o fluxo PARCIAL para sempre.
 
 ### Fronteira `api → service`
