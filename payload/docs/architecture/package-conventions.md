@@ -6,6 +6,11 @@
 Definir a organização do código Java utilizando
 arquitetura Feature-Based pragmática.
 
+É a **proposta** do kit (ADR-0001). Um projeto
+existente com outra organização a registra no
+ADR-0001 ("Revisão neste projeto") e só migra
+por decisão explícita (skill `architecture-decision`).
+
 Package base:
 `com.example.kitapp`
 
@@ -21,7 +26,7 @@ Package base:
 ## Estrutura de referência
 
 ```text
-catalog/
+com/example/kitapp/
 ├── KitMainApplication.java
 ├── feature/
 │   └── product/
@@ -100,13 +105,13 @@ Não deve depender de Spring, JDBC, HTTP
 ou bibliotecas de mensageria.
 
 ### persistence
-Implementa acesso ao PostgreSQL por meio
-de Spring JDBC e SQL explícito.
+Implementa o acesso a dados com a tecnologia
+adotada pelo projeto e registrada em ADR
+(Spring JDBC com JdbcClient/JdbcTemplate,
+Spring Data JDBC, Spring Data JPA ou outra).
 
-Pode utilizar JdbcClient, JdbcTemplate e
-mapeadores de resultados.
-
-Não utilizar JPA por padrão.
+Trocar ou introduzir tecnologia de persistência
+exige decisão (skill `architecture-decision`).
 
 ### scheduler
 Implementa gatilhos e execuções agendadas.

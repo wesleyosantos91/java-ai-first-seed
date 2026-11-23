@@ -98,12 +98,9 @@ class ArchitectureTest {
 						.should().dependOnClassesThat().resideInAnyPackage(API, SERVICE));
 	}
 
-	@Test
-	void persistenceTechnologyIsNotJpa() {
-		checkWhenEligible("código principal", javaClass -> true, noClasses().that().resideInAPackage(BASE + "..")
-				.should().dependOnClassesThat().resideInAnyPackage(
-						"jakarta.persistence..", "org.springframework.data.jpa..", "org.hibernate.."));
-	}
+	// Regras de tecnologia (por exemplo, proibir JPA ou exigir JDBC) não fazem parte deste template:
+	// só entram depois de um ADR aceito que as defina (skill architecture-decision,
+	// references/persistence.md), com .because("ADR-NNNN: ...").
 
 	@Test
 	void featuresAreFreeOfCycles() {

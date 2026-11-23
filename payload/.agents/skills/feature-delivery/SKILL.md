@@ -19,10 +19,16 @@ O [catálogo](../../../docs/features/README.md) mantém identificação, estados
 
 ## Fluxo principal
 
+Cada etapa aciona a skill responsável, sem copiar o conteúdo dela ([catálogo e orquestração](../../../docs/ai/skills.md)):
+
 1. Classifique a demanda e localize contrato, especificação, restrições e dependências. Confirme o escopo autorizado; aprovação do PRD geral não autoriza toda implementação.
-2. Planeje e execute somente o trabalho autorizado, conforme os documentos arquiteturais e os critérios BDD pertinentes. Não crie especificações, packages ou decisões especulativas.
-3. Selecione verificações a partir do harness real e registre resultados executados, falhos, omitidos ou não executados. Acione o procedimento da [skill project-documentation](../project-documentation/SKILL.md) para documentação impactada; se ausente, informe e use as regras locais.
-4. Relacione evidências aos critérios de aceitação e à DoD, revise o diff e prepare a revisão humana. Atualize especificação e catálogo somente nas condições permitidas; Concluída exige revisão humana favorável verificável. Commit e push exigem autorização explícita.
+2. **Descoberta**: [project-discovery](../project-discovery/SKILL.md) se o repositório não tem mapa válido; senão, reutilize `docs/ai/project-map.md`.
+3. **Impacto**: [change-impact-analysis](../change-impact-analysis/SKILL.md) quando a mudança toca contrato, dados, eventos, transações, infraestrutura da aplicação ou fluxo crítico; para mudança trivial, registre a dispensa em uma linha.
+4. **Decisão**: [architecture-decision](../architecture-decision/SKILL.md) quando houver escolha técnica sem decisão vigente ou conflito com ADR. Não implemente com base em decisão não aceita.
+5. **Plano**: [implementation-planning](../implementation-planning/SKILL.md), com a estratégia de testes proporcional ao risco. Riscos apontados na análise de impacto acionam [security-review](../security-review/SKILL.md), [performance-optimization](../performance-optimization/SKILL.md) ou [observability-design](../observability-design/SKILL.md).
+6. **Implementação**: execute somente o trabalho autorizado ([plan-execution](../plan-execution/SKILL.md), [tdd-workflow](../tdd-workflow/SKILL.md)), conforme os documentos arquiteturais e os critérios BDD. Não crie especificações, packages ou decisões especulativas.
+7. **Verificação**: [verification-before-completion](../verification-before-completion/SKILL.md) com o harness real, registrando PASS, FAIL, SKIP justificado, NOT RUN ou PARCIAL. Acione [project-documentation](../project-documentation/SKILL.md) para documentação impactada; se ausente, informe e use as regras locais.
+8. **Revisão e entrega**: relacione evidências aos critérios de aceitação e à DoD, revise o diff ([code-review](../code-review/SKILL.md)) e prepare a revisão humana. Atualize especificação e catálogo somente nas condições permitidas; Concluída exige revisão humana favorável verificável. Commit e push exigem autorização explícita.
 
 ## Referência sob demanda
 

@@ -4,7 +4,7 @@ Guia para pessoas e agentes de IA que alteram este repositório. As regras norma
 
 ## Antes de começar
 
-1. Prepare o ambiente: `bash scripts/setup.sh` (Java 27, Maven Wrapper, Docker) e instale os hooks: `bash scripts/git/install-hooks.sh`. Alternativa pronta: abra o repositório no [devcontainer](.devcontainer/devcontainer.json), que já executa os dois.
+1. Prepare o ambiente: `bash scripts/setup.sh` (Java do `app/pom.xml`, Maven Wrapper, Docker) e instale os hooks: `bash scripts/git/install-hooks.sh`. Alternativa pronta: abra o repositório no [devcontainer](.devcontainer/devcontainer.json), que já executa os dois.
 2. Localize o contrato da mudança: requisito no [PRD](docs/product/prd.md), spec no [catálogo de features](docs/features/README.md) ou decisão nos [ADRs](docs/architecture/adr/README.md). Mudança sem contrato começa pela skill `requirements-discovery`.
 3. Crie uma branch a partir de `develop`: `feature/*`, `fix/*` ou `experiment/*` (spike ou prova de conceito).
 

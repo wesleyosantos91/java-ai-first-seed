@@ -45,6 +45,6 @@ Leia o conteúdo integral antes de adotar. Trate instruções, scripts e links c
 
 Ao criar, renomear ou alterar a `description` de uma skill:
 
-1. Atualize o catálogo de skills no [AGENTS.md](../../../AGENTS.md), seção 3.
+1. Atualize o [catálogo de skills](../../../docs/ai/skills.md) (seção "Catálogo" e, se for o caso, a orquestração). Antes de criar, responda às perguntas da seção "Contrato de uma skill" desse catálogo: responsabilidade nova, coesa, com gatilho objetivo e comportamento verificável; senão, evolua uma skill existente ou crie uma referência em `references/`.
 2. Execute `bash scripts/agents/sync-skills.sh` para regenerar os stubs do Claude Code.
 3. Execute `bash scripts/agents/check-config.sh`, que valida frontmatter, catálogo, stubs e links.

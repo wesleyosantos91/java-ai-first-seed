@@ -19,7 +19,7 @@ Garantir que cada comportamento nasça de um teste que falha pelo motivo certo. 
 - A força dos testes é medida pelo PIT (`bash scripts/quality/mutation.sh`): mutantes sobreviventes indicam asserções fracas a corrigir no Refactor.
 - Testes de integração: sufixo exato `*IT.java` com Testcontainers, executados pelo Failsafe via `bash scripts/test/integration.sh`.
 - Os sufixos `*Tests`, `Test*` e `*ITCase` não são executados. Detalhes no [guia de testes](../../../docs/how-to/run-tests.md).
-- Nomeie testes pelo comportamento, por exemplo `shouldRejectDuplicateSku`, e use `@DisplayName` com o cenário BDD quando ajudar na rastreabilidade.
+- Nomeie testes pelo comportamento, por exemplo `shouldRejectDuplicateCode`, e use `@DisplayName` com o cenário BDD quando ajudar na rastreabilidade.
 
 ## Ciclo
 

@@ -2,9 +2,9 @@
 name: implementation-planning
 description: >-
   Converte uma especificação aprovada em plano técnico com tarefas pequenas, ordenadas
-  e verificáveis antes de editar código. Use para mudanças não triviais, features novas,
-  correções em vários arquivos ou refatorações. Não use para mudanças triviais nem para
-  decidir regras de produto.
+  e verificáveis e uma estratégia de testes proporcional ao risco, antes de editar
+  código. Use para mudanças não triviais, features novas, correções em vários arquivos
+  ou refatorações. Não use para mudanças triviais nem para decidir regras de produto.
 ---
 
 # Implementation Planning
@@ -15,8 +15,8 @@ Detalhar a fase 4 do [workflow de entrega](../feature-delivery/references/workfl
 
 ## Procedimento
 
-1. Leia a especificação e os arquivos existentes envolvidos; não planeje sobre suposições do código.
-2. Mapeie cada critério BDD para os componentes afetados (`api`, `service`, `domain`, `persistence`) e para o teste que o comprovará.
+1. Leia a especificação, o mapa do projeto (`project-discovery`), a análise de impacto (`change-impact-analysis`, quando houver) e os arquivos envolvidos; não planeje sobre suposições do código.
+2. Mapeie cada critério BDD para os componentes afetados (na organização adotada pelo projeto) e para o teste que o comprovará, seguindo a [estratégia de testes](references/testing-strategy.md).
 3. Liste somente arquivos e packages necessários, sem packages vazios ou abstrações especulativas.
 4. Quebre o trabalho em tarefas pequenas, cada uma com:
    - objetivo e arquivos;
@@ -32,8 +32,11 @@ Detalhar a fase 4 do [workflow de entrega](../feature-delivery/references/workfl
 ## Plano — FEAT-XXXX
 - [ ] T1 — <objetivo> · arquivos: ... · teste: ... · verificação: bash scripts/test/unit.sh
 - [ ] T2 — ...
+Estratégia de testes: <tipos por risco, com o que fica de fora e por quê>
 Riscos: ...
 Decisões pendentes: ...
 ```
+
+A estratégia define o que testar; a execução e seus resultados são comprovados por [verification-before-completion](../verification-before-completion/SKILL.md).
 
 Para trabalho que atravessa sessões ou providers, persista o plano com a [skill task-state-files](../task-state-files/SKILL.md). Execute com a [skill plan-execution](../plan-execution/SKILL.md).

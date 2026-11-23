@@ -1,13 +1,14 @@
 // Ambiente reproduzível para Codespaces, agentes em nuvem e desenvolvimento local em contêiner.
-// Mesma stack do AGENTS.md: Java 27 (Temurin, patch fixado; atualize deliberadamente),
-// Docker para Testcontainers e GitHub CLI.
+// Mesma stack do AGENTS.md: Java 25 (Temurin, LTS; baseline de projetos novos; o instalador grava
+// aqui o Java detectado no app/pom.xml), Docker para Testcontainers e GitHub CLI.
+// Patch fixado (SDKMAN 25.0.5.1+2-tem, conferido em 2026-11-23); atualize deliberadamente.
 // k6 não é instalado: o smoke de performance é execução explícita e opcional.
 {
   "name": "@@PROJECT_SLUG@@",
   "image": "mcr.microsoft.com/devcontainers/base:3.0.9-ubuntu24.04",
   "features": {
     "ghcr.io/devcontainers/features/java:1.8.3": {
-      "version": "27.0.1.1+4",
+      "version": "25.0.5.1+2",
       "jdkDistro": "tem",
       "installMaven": "false"
     },
