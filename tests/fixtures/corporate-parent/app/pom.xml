@@ -1,0 +1,11 @@
+<project>
+	<parent>
+		<groupId>com.corp</groupId>
+		<artifactId>corp-parent</artifactId>
+		<version>7.3.1</version>
+	</parent>
+	<artifactId>payments</artifactId>
+	<properties>
+		<java.version>${corp.java}</java.version>
+	</properties>
+</project>

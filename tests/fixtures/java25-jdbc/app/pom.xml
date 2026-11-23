@@ -1,0 +1,25 @@
+<project>
+	<groupId>com.acme</groupId>
+	<artifactId>ledger</artifactId>
+	<version>1.0.0</version>
+	<properties>
+		<maven.compiler.release>${jdk.release}</maven.compiler.release>
+		<jdk.release>25</jdk.release>
+		<spring-boot.version>4.0.3</spring-boot.version>
+	</properties>
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-dependencies</artifactId>
+				<version>${spring-boot.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+	<dependencies>
+		<dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-jdbc</artifactId></dependency>
+		<dependency><groupId>org.liquibase</groupId><artifactId>liquibase-core</artifactId></dependency>
+	</dependencies>
+</project>

@@ -1,29 +1,43 @@
-# Integrar o harness à CI
+# Contrato do harness para consumo pela CI
 
-Guia para o time de DevOps, que é dono de `.github/` ([layout do repositório](../architecture/repository-layout.md)). O harness oferece um ponto de entrada estável. O workflow só precisa chamá-lo e publicar os relatórios. Os agentes não escrevem workflows.
+Contrato técnico das verificações locais do kit, para quem as consome: o pipeline do time de DevOps, agentes e pessoas. **O kit não implementa CI/CD.** Workflows, runners, proteção de branch, deploy e a governança da CI são de responsabilidade exclusiva do time de DevOps ([layout do repositório](../architecture/repository-layout.md)). Este documento descreve só entradas, pré-requisitos, códigos de saída e artefatos; como e quando chamá-los é decisão do DevOps.
 
-## Ponto de entrada
+## Comandos
 
-```bash
-bash scripts/ci.sh
-```
+| Comando | O que verifica | Rede | Docker |
+|---|---|---|---|
+| `bash scripts/verify.sh` | Configuração de agentes e limites de qualidade, build, unitários, arquitetura (ArchUnit), integração e cobertura (JaCoCo) | Maven pode baixar dependências | Só se a integração usa Testcontainers |
+| `bash scripts/ci.sh` | `verify.sh` mais mutação (PIT) e varredura de segredos da árvore inteira; não interativo | Idem | Idem; e para o gitleaks, se ele não estiver no PATH |
+| `bash scripts/quality/mutation.sh` | Só a mutação | Idem | Não |
+| `bash scripts/security/scan-secrets.sh` | Só segredos (histórico e árvore) | Imagem do gitleaks, se via Docker | Se o gitleaks não estiver no PATH |
 
-| Etapa | O que roda | Status |
-|---|---|---|
-| verify | `scripts/verify.sh`: configuração de agentes, build, unitários, arquitetura, integração (Docker) e cobertura | Por etapa: PASS, SKIP, FAIL ou NOT RUN |
-| Mutação | `scripts/quality/mutation.sh` (PIT), só se o verify não falhou | PASS, SKIP, FAIL ou NOT RUN |
-| Segredos | `scripts/security/scan-secrets.sh` na árvore inteira | PASS, SKIP (sem gitleaks e sem Docker) ou FAIL |
+O nome `scripts/ci.sh` é mantido por compatibilidade: ele é a **verificação completa local**, não um pipeline.
 
-| Variável | Efeito |
+| Variável (`ci.sh`) | Efeito |
 |---|---|
-| `CI_MUTATION=0` | Omite a mutação (registrada como NOT RUN) |
+| `CI_MUTATION=0` | Omite a mutação (registrada como NOT RUN; resultado PARCIAL) |
 | `CI_SECRETS=0` | Omite a varredura de segredos (NOT RUN) |
-| `CI_REQUIRE_COMPLETE=1` | Resultado PARCIAL também falha a CI |
-| `SKIP_INTEGRATION=1` | Repassado ao `verify.sh`; só com justificativa, e o resultado fica PARCIAL |
+| `CI_REQUIRE_COMPLETE=1` | Resultado PARCIAL vira FAIL (exit 1) |
+| `SKIP_INTEGRATION=1` | Repassado ao `verify.sh`; só com justificativa; resultado PARCIAL |
 
-**Retorno:** `1` quando alguma etapa falha (ou com `CI_REQUIRE_COMPLETE=1` e resultado PARCIAL); `0` nos demais casos. PARCIAL significa que há SKIP ou NOT RUN, e **SKIP não equivale a PASS**: com os gates ainda opcionais (`QUALITY_GATES=optional` no `.harness`), o esperado é PARCIAL até que sejam ativados.
+## Pré-requisitos
 
-**Execuções simultâneas:** o harness usa uma trava por repositório (`scripts/lib/lock.sh`). Uma segunda execução no mesmo diretório falha na hora e informa o PID da que está rodando. Em CI, cada job usa o próprio checkout.
+- Bash 4+ com ferramentas GNU (Linux, ou Windows com Git Bash). O macOS precisa de `coreutils`, `gnu-sed` e `findutils` antes no PATH.
+- O Java declarado no `app/pom.xml` (veja `bash scripts/agents/detect-stack.sh`).
+- Maven Wrapper em `app/mvnw` (padrão) ou `mvn` no PATH com `MAVEN=system` no `.harness`.
+- Docker ativo quando a integração usa Testcontainers; gitleaks no PATH ou Docker para os segredos (sem os dois, a varredura é SKIP).
+
+## Códigos de saída
+
+| Código | Significado |
+|---|---|
+| `0` | PASS. Ou PARCIAL com `QUALITY_GATES=optional` no `.harness` (adoção gradual), sempre com aviso e `"result": "PARCIAL"` no JSON |
+| `3` | PARCIAL com `QUALITY_GATES=required`: alguma etapa SKIP ou NOT RUN. **Não é sucesso** |
+| `1` (ou outro ≠ 0 e ≠ 3) | FAIL: alguma etapa falhou, ou PARCIAL com `CI_REQUIRE_COMPLETE=1` |
+
+SKIP e NOT RUN nunca equivalem a PASS. Um consumidor que só olha o código de saída deve tratar `3` como não aprovado.
+
+**Execuções simultâneas:** o harness usa uma trava por repositório (`scripts/lib/lock.sh`). Uma segunda execução no mesmo diretório falha na hora e informa o PID da que está rodando.
 
 ## Resumo legível por máquina
 
@@ -37,6 +51,7 @@ O `verify.sh` grava `<APP_DIR>/target/harness/verify-summary.json`, e o `ci.sh` 
   "app_dir": "app",
   "quality_gates": "required",
   "kit_version": "2026-11-21.2a48f9b",
+  "exit_code": 3,
   "steps": {
     "agents": "PASS", "build": "PASS", "unit": "SKIP", "architecture": "PASS",
     "integration": "PASS", "coverage": "SKIP", "mutation": "SKIP", "secrets": "PASS"
@@ -45,53 +60,25 @@ O `verify.sh` grava `<APP_DIR>/target/harness/verify-summary.json`, e o `ci.sh` 
 }
 ```
 
-`result` é `PASS`, `PARCIAL` ou `FAIL`. Cada etapa em `steps` é `PASS`, `SKIP`, `FAIL` ou `NOT RUN`. `reports` lista os diretórios de relatório que existem: JUnit XML (`surefire-reports`, `architecture-reports`, `failsafe-reports`), JaCoCo (`site/jacoco`) e PIT (`pit-reports`). A chave `schema` muda se o formato mudar de forma incompatível.
+- `result`: `PASS`, `PARCIAL` ou `FAIL`. Cada etapa em `steps`: `PASS`, `SKIP`, `FAIL` ou `NOT RUN`.
+- `exit_code`: código de saída do script que gravou o resumo (campo aditivo; o `schema` continua 1).
+- `reports`: diretórios de relatório existentes, relativos à raiz: JUnit XML (`surefire-reports`, `architecture-reports`, `failsafe-reports`), JaCoCo (`site/jacoco`) e PIT (`pit-reports`).
+- A chave `schema` muda só se o formato mudar de forma incompatível.
 
-## Exemplo para GitHub Actions
+## Artefatos
 
-Referência para o time de DevOps adaptar. Não é instalado pelo kit.
+| Caminho | Conteúdo |
+|---|---|
+| `app/target/harness/` | Resumos JSON |
+| `app/target/surefire-reports/`, `architecture-reports/`, `failsafe-reports/` | JUnit XML das suítes |
+| `app/target/site/jacoco/` | Cobertura (XML e HTML) |
+| `app/target/pit-reports/` | Mutação (XML e HTML) |
 
-```yaml
-name: ci
-on:
-  pull_request:
-  push:
-    branches: [develop]
-jobs:
-  harness:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"   # o java.version de app/pom.xml
-      - run: bash scripts/ci.sh
-      - if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: harness-reports
-          path: |
-            app/target/harness/
-            app/target/*-reports/
-            app/target/site/jacoco/
-            app/target/pit-reports/
-```
+## Limites do kit
 
-Os runners `ubuntu-*` do GitHub já trazem Docker, que a integração com Testcontainers exige. O gitleaks é usado se estiver no PATH; sem ele, a varredura roda pelo Docker.
-
-## Proteção de `.github/` e da branch
-
-A regra de que agentes não alteram `.github/` só é bloqueada no Claude Code (`deny` no `.claude/settings.json`). No Codex e no Devin vale a regra do AGENTS.md e a revisão de código, e o `pre-commit` só avisa, porque o próprio time de DevOps faz commits nesse diretório. Para um controle que valha para todos, recomendamos ao time de DevOps:
-
-- **CODEOWNERS** com o time como dono de `.github/`:
-
-  ```text
-  /.github/ @org/devops
-  ```
-
-- **Proteção da branch `develop`** (ou da branch de integração): pull request obrigatório, revisão obrigatória de code owners e o job que chama `scripts/ci.sh` como verificação exigida.
+- O kit não cria, altera nem sugere workflows, runners, proteção de branch, CODEOWNERS ou deploy. Os agentes também não: `.github/` é do DevOps (AGENTS.md, seção 8). O Claude Code bloqueia `Edit`/`Write` em `.github/**`; no Codex e no Devin valem o AGENTS.md e a revisão de código, e o `pre-commit` só avisa.
+- Mudanças neste contrato (códigos, campos do JSON, caminhos) são comunicadas ao time de DevOps antes de entrar.
 
 ## Sistemas suportados
 
-O harness roda em Bash com ferramentas GNU (coreutils, `sed`, `find`, `awk`): **Linux** (runners de CI e o `.devcontainer`) e **Windows com Git Bash**. O `bash scripts/harness-tests/linux.sh` executa os testes do harness num contêiner Linux. O macOS, que usa ferramentas BSD (`sed -i` com outra sintaxe), não é suportado sem as ferramentas GNU (por exemplo, `brew install coreutils gnu-sed findutils`, com elas antes no PATH).
+O harness roda em Bash com ferramentas GNU: **Linux** (incluindo o `.devcontainer`) e **Windows com Git Bash**. O `bash scripts/harness-tests/linux.sh` executa os testes do harness num contêiner Linux.

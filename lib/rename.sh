@@ -12,7 +12,7 @@ rename_literal() {
   local root="$1" old="$2" new="$3" file pattern replacement
   [[ "${old}" != "${new}" ]] || return 0
   pattern="$(printf '%s' "${old}" | sed 's/[][\.*^$/#&]/\\&/g')"
-  replacement="$(printf '%s' "${new}" | sed 's/[\/#&]/\\&/g')"
+  replacement="$(printf '%s' "${new}" | sed 's/[\/#&\\]/\\&/g')"
   while IFS= read -r file; do
     sed -i "s#${pattern}#${replacement}#g" "${file}"
   done < <(rename_text_files "${root}" "${old}")

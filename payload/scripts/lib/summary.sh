@@ -4,8 +4,8 @@
 # Exige lib/app.sh carregado (ROOT_DIR, APP_ROOT, APP_DIR, QUALITY_GATES, KIT_VERSION).
 #
 # Formato (schema 1): result (PASS, PARCIAL ou FAIL), steps (etapa -> PASS, SKIP, FAIL ou NOT RUN),
-# app_dir, quality_gates, kit_version, generated_at (UTC) e reports (relatórios existentes,
-# relativos à raiz).
+# app_dir, quality_gates, kit_version, exit_code (aditivo; quando SUMMARY_EXIT_CODE está definido),
+# generated_at (UTC) e reports (relatórios existentes, relativos à raiz).
 
 # Resultado agregado: FAIL se alguma etapa falhou; PARCIAL se alguma foi SKIP ou NOT RUN.
 summary_result() {
@@ -27,8 +27,11 @@ write_summary() {
   mkdir -p "$(dirname -- "${file}")"
   {
     printf '{\n  "schema": 1,\n  "result": "%s",\n  "generated_at": "%s",\n' "${result}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    printf '  "app_dir": "%s",\n  "quality_gates": "%s",\n  "kit_version": "%s",\n  "steps": {' \
+    printf '  "app_dir": "%s",\n  "quality_gates": "%s",\n  "kit_version": "%s",\n' \
       "${APP_DIR}" "${QUALITY_GATES}" "${KIT_VERSION:-}"
+    # Campo aditivo (schema 1 mantido): código de saída do script que gravou o resumo.
+    [[ -z "${SUMMARY_EXIT_CODE:-}" ]] || printf '  "exit_code": %d,\n' "${SUMMARY_EXIT_CODE}"
+    printf '  "steps": {'
     for pair in "$@"; do
       (( first )) || printf ','
       printf '\n    "%s": "%s"' "${pair%%=*}" "${pair#*=}"

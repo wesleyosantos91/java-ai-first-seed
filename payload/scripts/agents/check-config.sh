@@ -6,7 +6,9 @@ set -Eeuo pipefail
 # somente para testes do harness; alterar o padrão exige revisão do ADR-0002.
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-ROOT_DIR="$(cd -- "${SCRIPT_DIR}/../.." && pwd -P)"
+# HARNESS_ROOT_DIR (opcional): verifica outra raiz com esta cópia do script, sem executar scripts
+# dessa raiz (usado pelo instalador do kit para validar o projeto).
+ROOT_DIR="$(cd -- "${HARNESS_ROOT_DIR:-${SCRIPT_DIR}/../..}" && pwd -P)"
 MAX_BYTES="${AGENT_CONTEXT_MAX_BYTES:-12288}"
 failures=0
 
@@ -62,16 +64,33 @@ fi
 (( ${#skills[@]} > 0 )) || fail "Nenhuma skill canônica em .agents/skills/."
 pass "Skills canônicas inspecionadas: ${#skills[@]}."
 
-# 3. Catálogo de skills do AGENTS.md igual aos diretórios existentes.
-if [[ -f AGENTS.md ]]; then
-  catalog="$(sed -n 's/^|[^|]*|[[:space:]]*`\([a-z0-9-]*\)`[[:space:]]*|.*/\1/p' AGENTS.md | sort -u)"
+# 3. Catálogo de skills (docs/ai/skills.md, seção "## Catálogo", referenciado pelo AGENTS.md) igual
+#    aos diretórios existentes.
+CATALOG=docs/ai/skills.md
+if [[ -f "${CATALOG}" ]]; then
+  catalog="$(awk '/^## Catálogo/ { on = 1; next } /^## / { on = 0 } on' "${CATALOG}" |
+    sed -n 's/^|[^|]*|[[:space:]]*`\([a-z0-9-]*\)`[[:space:]]*|.*/\1/p' | sort -u)"
   existing="$(printf '%s\n' "${skills[@]}" | sort -u)"
   missing="$(comm -13 <(printf '%s\n' "${catalog}") <(printf '%s\n' "${existing}") | sed '/^$/d')"
   unknown="$(comm -23 <(printf '%s\n' "${catalog}") <(printf '%s\n' "${existing}") | sed '/^$/d')"
-  [[ -z "${missing}" ]] || fail "Skills ausentes do catálogo do AGENTS.md: $(tr '\n' ' ' <<<"${missing}")"
-  [[ -z "${unknown}" ]] || fail "Catálogo do AGENTS.md cita skills inexistentes: $(tr '\n' ' ' <<<"${unknown}")"
-  [[ -n "${missing}${unknown}" ]] || pass "Catálogo de skills do AGENTS.md coerente com .agents/skills/."
+  [[ -z "${missing}" ]] || fail "Skills ausentes do catálogo (${CATALOG}): $(tr '\n' ' ' <<<"${missing}")"
+  [[ -z "${unknown}" ]] || fail "Catálogo (${CATALOG}) cita skills inexistentes: $(tr '\n' ' ' <<<"${unknown}")"
+  [[ -n "${missing}${unknown}" ]] || pass "Catálogo de skills (${CATALOG}) coerente com .agents/skills/."
+  grep -qF "](${CATALOG})" AGENTS.md 2>/dev/null || fail "AGENTS.md não referencia o catálogo de skills (${CATALOG})."
+else
+  fail "Catálogo de skills ${CATALOG} não encontrado."
 fi
+
+# 3a. Custo de contexto: a description de cada skill é carregada em toda sessão.
+MAX_DESCRIPTION="${SKILL_DESCRIPTION_MAX_CHARS:-700}"
+for file in "${skill_files[@]}"; do
+  chars="$(awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit }
+    /^description:/ { on = 1; sub(/^description:[[:space:]]*([>|][-+]?)?/, "") }
+    on && /^[a-z_-]+:/ && !/^description:/ { on = 0 }
+    on { gsub(/^[[:space:]]+/, ""); text = text $0 " " }
+    END { printf "%d", length(text) }' "${file}")"
+  (( chars <= MAX_DESCRIPTION )) || fail "${file}: description com ${chars} caracteres; limite ${MAX_DESCRIPTION} (detalhes vão no corpo ou em references/)."
+done
 
 # 4. Adaptadores do Claude Code: import do AGENTS.md e stubs sincronizados.
 if [[ -f CLAUDE.md ]] && grep -Eq '^@AGENTS\.md[[:space:]]*$' CLAUDE.md; then
@@ -107,6 +126,14 @@ if [[ -f .claude/settings.json ]]; then
   for rule in 'Edit(./.github/**)' 'Write(./.github/**)'; do
     grep -qF "\"${rule}\"" .claude/settings.json || fail ".claude/settings.json sem deny ${rule} (.github/ é gerido por DevOps)."
   done
+  # Autoproteção: o agente não pode afrouxar as próprias permissões, as do Codex nem os hooks.
+  for rule in 'Edit(./.claude/settings.json)' 'Edit(./.codex/**)' 'Edit(./scripts/agents/hooks/**)'; do
+    grep -qF "\"${rule}\"" .claude/settings.json || fail ".claude/settings.json sem deny ${rule} (configuração de agentes protegida)."
+  done
+  # Allow amplo de scripts permitiria editar um script e executá-lo sem confirmação.
+  if grep -qE '"Bash\(bash scripts/\*\)"' .claude/settings.json; then
+    fail ".claude/settings.json com allow amplo Bash(bash scripts/*); liste só os entrypoints de verificação."
+  fi
   while IFS= read -r hook; do
     [[ -f "${hook}" ]] || fail ".claude/settings.json referencia hook inexistente: ${hook}"
   done < <(grep -o 'CLAUDE_PROJECT_DIR/[^"\\]*' .claude/settings.json | sed 's#^CLAUDE_PROJECT_DIR/##')
@@ -164,8 +191,8 @@ fi
 
 # 6b'. .harness: chaves válidas; em projetos, o pom fica sempre em app/ (docs/architecture/
 # repository-layout.md). Só o repositório de referência (REPOSITORY_ROLE=reference) usa outro APP_DIR.
-if harness_error="$(source "${ROOT_DIR}/scripts/lib/app.sh" 2>&1 >/dev/null)"; then
-  harness_dir="$(source "${ROOT_DIR}/scripts/lib/app.sh" && printf '%s %s' "${APP_DIR}" "${REPOSITORY_ROLE}")"
+if harness_error="$(source "${SCRIPT_DIR}/../lib/app.sh" 2>&1 >/dev/null)"; then
+  harness_dir="$(source "${SCRIPT_DIR}/../lib/app.sh" && printf '%s %s' "${APP_DIR}" "${REPOSITORY_ROLE}")"
   harness_role="${harness_dir#* }" harness_dir="${harness_dir%% *}"
   if [[ "${harness_role}" == reference || "${harness_dir}" == app ]]; then
     pass ".harness válido (APP_DIR=${harness_dir})."
@@ -178,7 +205,7 @@ fi
 
 # 6c. PRD: pendências são esperadas em elaboração; aprovação com pendências é rejeitada.
 prd_code=0
-prd_output="$(bash "${ROOT_DIR}/scripts/product/check-prd.sh" 2>&1)" || prd_code=$?
+prd_output="$(bash "${SCRIPT_DIR}/../product/check-prd.sh" 2>&1)" || prd_code=$?
 case "${prd_code}" in
   0) pass "PRD sem campos pendentes." ;;
   3) echo "[INFO] PRD em elaboração ou ausente; detalhes: bash scripts/product/check-prd.sh." ;;

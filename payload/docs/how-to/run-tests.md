@@ -5,7 +5,7 @@ Guia operacional para desenvolvedores e agentes. A Etapa 6A separa as suítes e 
 ## Pré-requisitos
 
 - Windows 11 com Git Bash, ou ambiente Bash compatível.
-- Java no PATH igual ou superior ao `java.version` do pom do app (`setup.sh` compara); baseline deste repositório: Java 27, Temurin 27+35.
+- Java no PATH igual ou superior ao Java declarado no pom do app (`maven.compiler.release`, `<release>` do compiler plugin ou `java.version`; `setup.sh` compara). Baseline do kit para projetos novos: Java 25 LTS. A versão de um projeto existente é preservada; upgrade exige aprovação. Stack detectada: `bash scripts/agents/detect-stack.sh`.
 - Maven Wrapper versionado, que resolve Maven 3.10.0; não é necessário Maven global.
 - Docker Desktop funcional com contêineres Linux para integração.
 - Acesso aos repositórios Maven e Docker na primeira resolução dos artefatos.
@@ -27,7 +27,9 @@ bash scripts/quality/mutation.sh     # explícito; fora do verify.sh
 | Em `scripts/` | Responsabilidade |
 |---|---|
 | `setup.sh`, `verify.sh` | Inspecionar ambiente; fluxo padrão (agentes, build, unitários, arquitetura, integração, cobertura), com resumo JSON em `target/harness/` |
-| `ci.sh` | Ponto de entrada da CI: `verify.sh`, mutação e segredos, com resumo JSON ([integração à CI](ci-integration.md)) |
+| `ci.sh` | Verificação completa local (não é pipeline): `verify.sh`, mutação e segredos, com resumo JSON ([contrato para a CI](ci-integration.md)) |
+| `quality/check-thresholds.sh` | Protege os limites aprovados (JaCoCo 0.90, PIT 90) contra redução no pom; roda na etapa de agentes do `verify.sh` |
+| `agents/detect-stack.sh` | Stack detectada (Java, Spring Boot, persistência, módulos) com a origem de cada valor; `--effective` consulta o pom efetivo |
 | `build/`, `test/`, `quality/coverage.sh` | Etapas individuais do fluxo padrão |
 | `quality/mutation.sh`, `performance/smoke.sh` | PIT e smoke k6; explícitos, fora do `verify.sh` |
 | `quality/enable-gates.sh` | Aplica no app os blocos prontos de quality gates (`--dry-run` ou `--apply`; mudança de build, só com autorização) |
@@ -48,8 +50,8 @@ Os scripts ficam na raiz, mas o Maven executa no diretório do app, declarado no
 |---|---|---|
 | `APP_DIR` | Caminho relativo, sem `..` (padrão `.`) | Onde ficam `pom.xml`, `mvnw`, `src/` e `target/`. Neste repositório, `.`; nos projetos que recebem o kit, sempre `app` ([layout do repositório](../architecture/repository-layout.md)) |
 | `QUALITY_GATES` | `required` (padrão) ou `optional` | Gate não configurado no pom do app (sem a execução `architecture`, o Failsafe, o JaCoCo `coverage-check`, o `pitest-maven` ou as propriedades `app.*`): `required` = FAIL; `optional` = SKIP, com o motivo e o [guia para ativar](enable-quality-gates.md) |
-
 | `REPOSITORY_ROLE` | `project` (padrão) ou `reference` | Só `reference` (este repositório) aceita `APP_DIR` diferente de `app` |
+| `MAVEN` | `wrapper` (padrão) ou `system` | `wrapper`: `<APP_DIR>/mvnw`, versão fixada pelo projeto. `system`: `mvn` do PATH, para projetos sem Wrapper (a versão não é fixada; o `compile.sh` a registra na saída) |
 
 Os caminhos `target/...` deste guia são relativos ao `APP_DIR`. O `check-config.sh` rejeita chaves e valores inválidos e, em projetos, um `APP_DIR` diferente de `app`. O `unit.sh` avisa quando há classes `*Tests` (padrão do Spring Initializr), que a convenção não executa.
 
@@ -90,11 +92,11 @@ Os dois plugins têm `failIfNoTests=true`. Assim, Maven direto falha quando a su
 | SKIP | exit `3` | Não existem classes elegíveis ou há testes ignorados; os contadores mostram eventual execução parcial |
 | FAIL | exit `1` | Maven/Docker falhou, relatórios estão ausentes/inválidos ou classes elegíveis produziram zero testes |
 
-Erros de shell também retornam código diferente de zero. Falhas Maven são normalizadas para `1` pelos scripts de suíte, para não confundir um código de erro `3` com SKIP. Docker indisponível é FAIL da etapa; os testes de integração ficam NOT RUN, nunca SKIP silencioso.
+Erros de shell também retornam código diferente de zero. Falhas Maven são normalizadas para `1` pelos scripts de suíte, para não confundir um código de erro `3` com SKIP. Docker só é exigido quando a integração usa Testcontainers (no pom ou nas fontes de teste); nesse caso, Docker indisponível é FAIL da etapa e os testes de integração ficam NOT RUN, nunca SKIP silencioso.
 
 Os scripts removem somente os XML gerados da própria suíte antes da execução e leem os contadores `tests`, `failures`, `errors` e `skipped` dos novos relatórios. Não executá-los simultaneamente na mesma árvore, pois compartilham `target/`. O parser espera o formato XML padrão dos plugins fixados; um formato incompatível resulta em FAIL.
 
-`verify.sh` executa a verificação da configuração de agentes (`agents/check-config.sh`, sem Maven; ver [context engineering](../ai/context-engineering.md#harness-da-configuração)), build (`clean compile`), unitários, arquitetura, integração e cobertura, sem repetir unitários na etapa de integração. A mutação não faz parte desse fluxo. Em erro, retorna código diferente de zero e resume etapas restantes como NOT RUN. Em SKIP, continua e termina com exit `0`, resumo por etapa e resultado PARCIAL. Esse retorno permite inspecionar a integração mesmo sem unitários; não é evidência de aceitação completa pela [DoD](../engineering/definition-of-done.md).
+`verify.sh` executa a verificação da configuração de agentes (`agents/check-config.sh`, sem Maven; ver [context engineering](../ai/context-engineering.md#harness-da-configuração)), build (`clean compile`), unitários, arquitetura, integração e cobertura, sem repetir unitários na etapa de integração. A mutação não faz parte desse fluxo. Antes do build, verifica também se os limites aprovados dos gates foram preservados no pom (`quality/check-thresholds.sh`). Em erro, retorna código diferente de zero e resume etapas restantes como NOT RUN. Em SKIP, continua até o fim e termina PARCIAL, com resumo por etapa: **exit `3` com `QUALITY_GATES=required`** e exit `0` com aviso com `QUALITY_GATES=optional` (adoção gradual). Em nenhum caso PARCIAL é evidência de aceitação completa pela [DoD](../engineering/definition-of-done.md).
 
 Somente quando autorizado ou com justificativa comunicada:
 
@@ -160,7 +162,7 @@ Fixtures e logs ficam em diretórios únicos sob `target/`, inclusive com espaç
 
 | Gate | Versão | Meta | Script | Relatórios |
 |---|---|---|---|---|
-| ArchUnit | 1.5.1 (suporta class files Java 27, major 71) | Nenhuma violação | `test/architecture.sh` | `target/architecture-reports/` |
+| ArchUnit | 1.5.1 (confirme o suporte ao class file do Java do app) | Nenhuma violação | `test/architecture.sh` | `target/architecture-reports/` |
 | JaCoCo | 0.8.16 | LINE ≥ 90% e BRANCH ≥ 90% | `quality/coverage.sh` | `target/site/jacoco/index.html` e `jacoco.xml` |
 | PIT | 1.30.1, com pitest-junit5-plugin 1.2.3 | Mutation score ≥ 90% | `quality/mutation.sh` | `target/pit-reports/index.html` e `mutations.xml` |
 
@@ -186,10 +188,11 @@ As regras estão em `src/test/java/com/example/kitapp/architecture/ArchitectureT
 | `api` não usa JDBC/SQL | Controllers não executam SQL | `feature.*.api` |
 | `api` não depende de `domain` | `api` depende somente de `service` (dependency-rules, ADR-0003) | `feature.*.api` |
 | Producers não dependem de `api` nem de `service` | Integrações | `feature.*.messaging..producer` |
-| Nenhuma classe usa JPA (`jakarta.persistence`, Spring Data JPA, Hibernate) | ADR-0001; AGENTS.md | Todo o código de produção |
 | Features livres de ciclos | Comunicação entre features | Ao menos duas features |
 | Packages internos de cada feature livres de ciclos | "Dependências cíclicas não são permitidas" | Feature com ao menos dois packages internos |
 | Feature não acessa a `persistence` de outra | Comunicação entre features | Duas features e alguma `persistence` |
+
+As regras do template valem para a organização Feature-Based proposta pelo kit; em projetos com outra organização, ficam N/A até um ADR definir as regras do projeto. Regras de tecnologia (por exemplo, proibir JPA) não fazem parte do template: só entram depois de um ADR aceito ([referência](../../.agents/skills/architecture-decision/references/persistence.md)).
 
 Uma regra sem classes elegíveis é ignorada com o marcador `[N/A]` na premissa e reportada como **não aplicável**: não conta como SKIP e aparece no resumo (`N/A=n`). A arquitetura é PASS quando nenhuma regra aplicável falha e ao menos uma executa; se todas forem N/A, é SKIP ([ADR-0003](../architecture/adr/0003-test-suites-and-quality-gates.md)).
 

@@ -24,7 +24,7 @@ entre componentes da arquitetura Feature-Based.
 O domínio não deve depender de:
 
 - Spring MVC
-- Spring JDBC
+- APIs de persistência (JDBC, JPA ou outra)
 - Controllers ou DTOs HTTP
 - Consumers e producers
 - Clientes de infraestrutura

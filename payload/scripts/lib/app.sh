@@ -6,18 +6,22 @@
 #   QUALITY_GATES  required (gate não configurado no pom = FAIL) | optional (= SKIP)
 #   REPOSITORY_ROLE  project (padrão: pom sempre em app/) | reference (repositório de referência)
 #   KIT_VERSION    versão do kit AI-First aplicada (informativa; gravada pelo instalador)
-# Sem .harness: APP_DIR=., QUALITY_GATES=required, REPOSITORY_ROLE=project. Exige ROOT_DIR definido.
+#   MAVEN          wrapper (padrão: <APP_DIR>/mvnw, versão fixada pelo projeto) | system (mvn do PATH,
+#                  para projetos sem Maven Wrapper; a versão usada é registrada na saída)
+# Sem .harness: APP_DIR=., QUALITY_GATES=required, REPOSITORY_ROLE=project, MAVEN=wrapper.
+# Exige ROOT_DIR definido.
 APP_DIR=.
 QUALITY_GATES=required
 REPOSITORY_ROLE=project
 KIT_VERSION=
+MAVEN=wrapper
 if [[ -f "${ROOT_DIR}/.harness" ]]; then
   while IFS='=' read -r key value || [[ -n "${key}" ]]; do
     key="${key//[[:space:]]/}"
     case "${key}" in
       ''|'#'*) continue ;;
-      APP_DIR|QUALITY_GATES|REPOSITORY_ROLE|KIT_VERSION) ;;
-      *) echo "[FAIL] .harness: chave desconhecida '${key}' (válidas: APP_DIR, QUALITY_GATES, REPOSITORY_ROLE, KIT_VERSION)." >&2; return 1 ;;
+      APP_DIR|QUALITY_GATES|REPOSITORY_ROLE|KIT_VERSION|MAVEN) ;;
+      *) echo "[FAIL] .harness: chave desconhecida '${key}' (válidas: APP_DIR, QUALITY_GATES, REPOSITORY_ROLE, KIT_VERSION, MAVEN)." >&2; return 1 ;;
     esac
     # Comentário ao fim da linha e espaços nas bordas são descartados; espaço interno é inválido.
     value="${value%%#*}"
@@ -38,17 +42,32 @@ case "${REPOSITORY_ROLE}" in
   project|reference) ;;
   *) echo "[FAIL] .harness: REPOSITORY_ROLE '${REPOSITORY_ROLE}' inválido (project ou reference)." >&2; return 1 ;;
 esac
+case "${MAVEN}" in
+  wrapper|system) ;;
+  *) echo "[FAIL] .harness: MAVEN '${MAVEN}' inválido (wrapper ou system)." >&2; return 1 ;;
+esac
 APP_ROOT="$(cd -- "${ROOT_DIR}/${APP_DIR}" 2>/dev/null && pwd -P)" ||
   { echo "[FAIL] .harness: APP_DIR '${APP_DIR}' não existe." >&2; return 1; }
 # Caminho do app para mensagens ("pom.xml" no lab, "app/pom.xml" em projetos).
 APP_PREFIX=''
 [[ "${APP_DIR}" == . ]] || APP_PREFIX="${APP_DIR%/}/"
 
-# Exige o pom e o Maven Wrapper do app; retorna 1 com mensagem.
+# Exige o pom e o Maven do app (Wrapper, ou mvn do PATH com MAVEN=system); retorna 1 com mensagem.
 require_maven_project() {
+  if [[ "${MAVEN}" == system ]]; then
+    [[ -f "${APP_ROOT}/pom.xml" ]] && command -v mvn >/dev/null 2>&1 || {
+      echo "[FAIL] ${APP_PREFIX}pom.xml não encontrado ou mvn ausente do PATH (MAVEN=system no .harness)." >&2; return 1;
+    }
+    return 0
+  fi
   [[ -f "${APP_ROOT}/pom.xml" && -f "${APP_ROOT}/mvnw" ]] || {
-    echo "[FAIL] ${APP_PREFIX}pom.xml ou Maven Wrapper (${APP_PREFIX}mvnw) não encontrado." >&2; return 1;
+    echo "[FAIL] ${APP_PREFIX}pom.xml ou Maven Wrapper (${APP_PREFIX}mvnw) não encontrado. Sem Wrapper: gere-o (mvn wrapper:wrapper, com aprovação) ou use MAVEN=system no .harness." >&2; return 1;
   }
+}
+
+# Executa o Maven do app no diretório atual (Wrapper ou mvn do PATH, conforme MAVEN).
+run_maven() {
+  if [[ "${MAVEN}" == system ]]; then mvn "$@"; else bash ./mvnw "$@"; fi
 }
 
 # Gate sem configuração no pom: FAIL se obrigatório, SKIP (exit 3) se opcional.

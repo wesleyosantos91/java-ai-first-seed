@@ -29,15 +29,18 @@ run_test_suite() {
     ( gate_not_configured "${suite}" "${TEST_SUITE_REQUIRES}" ) || return $?
   fi
 
-  if [[ "${suite}" == "Integração" ]]; then
+  # Docker só é exigido quando a integração usa Testcontainers (pom ou fontes de teste); app sem
+  # banco ou com outra estratégia roda a integração sem Docker.
+  if [[ "${suite}" == "Integração" ]] &&
+     grep -rqis testcontainers "${APP_ROOT}/pom.xml" "${APP_ROOT}/src/test" 2>/dev/null; then
     command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 || {
-      echo "[FAIL] Docker indisponível; integração NOT RUN." >&2; return 1;
+      echo "[FAIL] Docker indisponível e a integração usa Testcontainers; integração NOT RUN." >&2; return 1;
     }
   fi
 
   cd "${APP_ROOT}"
   echo "[INFO] ${suite}: executando ${pattern}..."
-  if ! bash ./mvnw --batch-mode --no-transfer-progress "$@"; then
+  if ! run_maven --batch-mode --no-transfer-progress "$@"; then
     echo "[FAIL] ${suite}: Maven falhou. Relatórios: ${report_dir}" >&2
     return 1
   fi

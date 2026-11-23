@@ -1,5 +1,8 @@
 # Regras de comando do Codex (execpolicy, Starlark). Reforçam o AGENTS.md, seções 8 e 9:
-# commit, push, merge e rebase exigem autorização; force-push é proibido.
+# commit, push, merge e rebase exigem autorização; force-push é proibido; comandos que descartam
+# trabalho local (reset --hard, clean, restore, checkout --, rm -r) e a aplicação dos gates pedem
+# aprovação. Regras são por prefixo de comando: um agente pode contorná-las por outro caminho
+# (sh -c, script); a garantia final são os hooks Git e a revisão humana.
 # Verifique com: codex execpolicy check --pretty --rules .codex/rules/delivery.rules -- git push
 
 prefix_rule(
@@ -24,4 +27,46 @@ prefix_rule(
     justification = "Comando destrutivo; exige autorização explícita (AGENTS.md, seção 8).",
     match = ["git reset --hard HEAD~1"],
     not_match = ["git reset --soft HEAD~1"],
+)
+
+# Opções globais antes do subcomando (git -C <dir> push) escapariam das regras acima, que são
+# por prefixo: qualquer git -C ou -c pede aprovação.
+prefix_rule(
+    pattern = ["git", ["-C", "-c"]],
+    decision = "prompt",
+    justification = "Opção global do git antes do subcomando; confirme o subcomando real (AGENTS.md, seções 8 e 9).",
+    match = ["git -C app push origin feature/x", "git -c core.hooksPath=/dev/null commit -m x"],
+    not_match = ["git status"],
+)
+
+prefix_rule(
+    pattern = ["git", ["clean", "restore"]],
+    decision = "prompt",
+    justification = "Descarta alterações locais; exige autorização explícita (AGENTS.md, seção 8).",
+    match = ["git clean -fdx", "git restore ."],
+    not_match = ["git diff"],
+)
+
+prefix_rule(
+    pattern = ["git", "checkout", "--"],
+    decision = "prompt",
+    justification = "Descarta alterações locais; exige autorização explícita (AGENTS.md, seção 8).",
+    match = ["git checkout -- ."],
+    not_match = ["git checkout -b feature/x"],
+)
+
+prefix_rule(
+    pattern = ["rm", ["-rf", "-fr", "-r"]],
+    decision = "prompt",
+    justification = "Remoção recursiva; exige autorização explícita (AGENTS.md, seção 8).",
+    match = ["rm -rf target", "rm -r docs"],
+    not_match = ["rm file.txt"],
+)
+
+prefix_rule(
+    pattern = ["bash", "scripts/quality/enable-gates.sh", "--apply"],
+    decision = "prompt",
+    justification = "Altera o build do app (pom e classes de teste); exige autorização (docs/how-to/enable-quality-gates.md).",
+    match = ["bash scripts/quality/enable-gates.sh --apply"],
+    not_match = ["bash scripts/quality/enable-gates.sh --dry-run"],
 )

@@ -1,45 +1,43 @@
 ---
 name: architecture-guard
 description: >-
-  Verifica se código novo ou alterado respeita a arquitetura Feature-Based, as
-  convenções de packages e as regras de dependência deste repositório, e
-  identifica quando uma mudança exige decisão arquitetural (ADR). Use ao planejar,
-  implementar ou revisar código Java. Não use para aprovar ADRs nem alterar padrões
-  aprovados unilateralmente.
+  Verifica se código novo ou alterado respeita a arquitetura aprovada do projeto (ADRs
+  aceitos, convenções de packages e regras de dependência) e identifica quando uma
+  mudança exige decisão arquitetural (ADR). Use ao planejar, implementar ou revisar
+  código Java. Não use para tomar decisões novas (architecture-decision), aprovar ADRs
+  nem alterar padrões aprovados unilateralmente.
 ---
 
 # Architecture Guard
 
 ## Fontes de verdade
 
-- [ADR-0001 — Princípios de arquitetura](../../../docs/architecture/adr/0001-architecture-principles.md)
-- [Convenções de packages](../../../docs/architecture/package-conventions.md)
-- [Regras de dependência](../../../docs/architecture/dependency-rules.md)
+- ADRs com status `Aceita` ([índice](../../../docs/architecture/adr/README.md)); enquanto a seção "Revisão neste projeto" de um ADR do kit não estiver decidida, ele é **proposta**, não regra.
+- [Convenções de packages](../../../docs/architecture/package-conventions.md) e [regras de dependência](../../../docs/architecture/dependency-rules.md), na medida em que o projeto as adotou.
+- O mapa do projeto (`docs/ai/project-map.md`, skill `project-discovery`): a arquitetura real prevalece sobre a proposta do kit até que um ADR decida migrar.
 
-Esta skill resume os pontos de verificação; em divergência, os documentos prevalecem.
+Esta skill resume os pontos de verificação; em divergência, os documentos aceitos prevalecem.
 
 ## Verificações
 
-1. **Localização** — O código de negócio está em `com.example.kitapp.feature.<feature>`; `shared` contém apenas componentes genuinamente transversais.
-2. **Direção das dependências** — `api → service → domain`, `service → persistence`, `persistence → domain` quando necessário. Nenhuma dependência no sentido inverso nem ciclo.
-3. **Domain puro** — Sem imports de Spring MVC, Spring JDBC, DTOs HTTP, persistência ou mensageria.
-4. **Controllers finos** — Sem SQL, acesso direto a repository, regra de negócio ou coordenação transacional de múltiplas operações.
-5. **Persistence** — SQL explícito com `JdbcClient` ou `JdbcTemplate`; sem JPA; sem decisão de negócio.
-6. **Entre features** — Nenhum acesso ao repository de outra feature; comunicação por contrato explícito.
-7. **YAGNI** — Nenhum package vazio, interface com implementação única sem motivo, nem Ports, Use Cases ou Adapters por padrão.
+1. **Localização**: o código de negócio está na organização adotada (por feature, por camada ou híbrida, conforme o ADR e o mapa); `shared` ou equivalente contém apenas componentes genuinamente transversais.
+2. **Direção das dependências**: conforme as regras adotadas (na proposta do kit: `api → service → domain`, `service → persistence`, `persistence → domain`). Nenhuma dependência no sentido inverso nem ciclo.
+3. **Domínio**: regras de negócio sem dependência de transporte (HTTP), mensageria ou detalhes de persistência, na medida decidida pelo ADR.
+4. **Controllers finos**: sem SQL, acesso direto a repository, regra de negócio ou coordenação transacional de múltiplas operações.
+5. **Persistência**: com a tecnologia aprovada no ADR (JDBC, Spring Data JDBC, JPA ou outra); sem decisão de negócio; sem introduzir outra tecnologia sem decisão.
+6. **Entre features ou módulos**: nenhum acesso ao repository de outra feature ou módulo; comunicação por contrato explícito.
+7. **YAGNI**: nenhum package vazio, interface com implementação única sem motivo, nem Ports, Use Cases ou Adapters por padrão.
 
 ## Verificação prática
-
-Execute as regras automatizadas:
 
 ```bash
 bash scripts/test/architecture.sh
 ```
 
-As regras estão em `src/test/java/com/example/kitapp/architecture/ArchitectureTest.java` e cobrem a verificação 3, as proibições das verificações 2 e 6, o acesso a persistence e SQL da 4 e a ausência de JPA da 5. Regras sem classes elegíveis aparecem como SKIP, não como aprovação.
+As regras estão em `src/test/java/com/example/kitapp/architecture/ArchitectureTest.java` e cobrem as fronteiras da organização Feature-Based proposta pelo kit. Em projetos com outra organização, as regras por feature ficam N/A (não aprovação) até que um ADR decida as regras do projeto. Regras de **tecnologia** (por exemplo, proibir JPA) só existem depois de um ADR aceito que as defina ([referência](../architecture-decision/references/persistence.md)).
 
-Continuam exigindo revisão: a verificação 1, a lista completa de dependências permitidas da 2, a ausência de regra de negócio e de coordenação transacional em controllers (4), as decisões de negócio na persistence (5) e o YAGNI (7). Declare-as como revisão manual, não como validação automática. Ao identificar nova restrição documentada, siga a [skill quality-gates](../quality-gates/SKILL.md) para adicionar a regra.
+Continuam exigindo revisão: a localização (1), a lista completa de dependências permitidas (2), a ausência de regra de negócio e de coordenação transacional em controllers (4), decisões de negócio na persistência (5) e o YAGNI (7). Declare-as como revisão manual, não como validação automática. Ao identificar nova restrição documentada e aceita, siga a [skill quality-gates](../quality-gates/SKILL.md) para adicionar a regra.
 
 ## Quando parar
 
-Se a solução exigir violar uma regra, introduzir JPA, nova biblioteca estrutural ou mudar fronteiras, pare: descreva a contradição, alternativas e trade-offs e solicite decisão técnica. Um novo ADR só é redigido com autorização e nunca é aceito pelo agente.
+Se a solução exigir violar uma regra aceita, trocar a tecnologia de persistência, introduzir biblioteca estrutural ou mudar fronteiras, pare: descreva a contradição e acione [architecture-decision](../architecture-decision/SKILL.md). Um novo ADR só é redigido com autorização e nunca é aceito pelo agente. Nunca adicione, remova ou afrouxe uma regra ArchUnit para obter PASS.

@@ -7,5 +7,8 @@ sandbox_mode = "workspace-write"
 approval_policy = "on-request"
 
 [sandbox_workspace_write]
-# Downloads do Maven Wrapper e imagens do Testcontainers exigem rede.
+# Downloads do Maven Wrapper e imagens do Testcontainers exigem rede. Risco residual: com rede, um
+# conteúdo malicioso (prompt injection em dependência, página ou saída de ferramenta) poderia
+# induzir exfiltração; o AGENTS.md (seção 8) trata esses conteúdos como dados. Em ambiente
+# restrito, use false com o repositório Maven local já populado (o harness funciona offline).
 network_access = true

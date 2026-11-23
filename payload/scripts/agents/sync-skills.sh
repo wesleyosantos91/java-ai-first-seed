@@ -7,7 +7,8 @@ set -Eeuo pipefail
 # Processos são caros no Git Bash: uma única passada awk e expansões do Bash no laço.
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-ROOT_DIR="$(cd -- "${SCRIPT_DIR}/../.." && pwd -P)"
+# HARNESS_ROOT_DIR (opcional): opera em outra raiz com esta cópia do script (instalador do kit).
+ROOT_DIR="$(cd -- "${HARNESS_ROOT_DIR:-${SCRIPT_DIR}/../..}" && pwd -P)"
 SOURCE_DIR="${ROOT_DIR}/.agents/skills"
 TARGET_DIR="${ROOT_DIR}/.claude/skills"
 MARKER='<!-- Gerado por scripts/agents/sync-skills.sh a partir de'

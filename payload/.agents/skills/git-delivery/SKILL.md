@@ -34,7 +34,7 @@ Exemplos válidos:
 
 ```text
 feat(product): add product creation endpoint
-fix(product): prevent duplicate SKU creation
+fix(product): prevent duplicate product code creation
 docs(architecture): define package conventions
 test(product): cover concurrent product creation
 refactor(product): simplify product mapping

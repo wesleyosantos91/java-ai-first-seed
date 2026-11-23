@@ -8,4 +8,5 @@ Adaptador do Claude Code ([ADR-0002](docs/architecture/adr/0002-multi-provider-a
 
 - As skills canônicas estão em `.agents/skills/`. Os arquivos em `.claude/skills/` são stubs gerados por `bash scripts/agents/sync-skills.sh`; não os edite.
 - `.claude/settings.json` reforça os limites de autonomia: comandos de entrega pedem confirmação, e o hook `scripts/agents/hooks/claude-pre-bash.sh` aplica `scripts/git/guard-branch.sh` antes de `git commit` e `git push`.
+- Execute cada script do harness como comando único (`bash scripts/verify.sh`), a partir da raiz, sem `cd ... &&`, `;` ou pipes: as permissões do `allow` casam o comando inteiro, e um comando composto pede confirmação (negada em sessões não interativas). Verificado nos evals do kit.
 - Preferências pessoais ficam em `CLAUDE.local.md` e `.claude/settings.local.json`, ambos fora do versionamento.

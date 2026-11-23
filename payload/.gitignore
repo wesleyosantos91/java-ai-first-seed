@@ -38,3 +38,9 @@ build/
 .claude/settings.local.json
 CLAUDE.local.md
 AGENTS.local.md
+
+### Instalador do kit AI-First (versões novas a mesclar e estado de uma instalação em curso) ###
+*.kit
+.kit-install.journal
+.kit-install.backup/
+.kit-install.lock/

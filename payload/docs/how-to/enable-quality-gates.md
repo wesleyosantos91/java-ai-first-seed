@@ -12,11 +12,13 @@ Este guia descreve o que adicionar para que JaCoCo, PIT e ArchUnit executem de f
 | Arquitetura | `scripts/test/architecture.sh` | Execução Surefire `<id>architecture</id>`; classe `*ArchitectureTest` | SKIP (`optional`) ou FAIL (`required`) |
 | Integração | `scripts/test/integration.sh` | `maven-failsafe-plugin` e propriedade `skipUnitTests`; classes `*IT` | SKIP ou FAIL |
 | Cobertura | `scripts/quality/coverage.sh` | JaCoCo com as execuções `prepare-unit-agent`, `prepare-integration-agent`, `coverage-merge`, `coverage-report` e `coverage-check`; propriedade `app.mainClass` | SKIP ou FAIL |
-| Mutação | `scripts/quality/mutation.sh` | `pitest-maven` com `targetClasses` em `feature/*/domain` e `feature/*/service`; propriedade `app.basePath` | SKIP ou FAIL |
+| Mutação | `scripts/quality/mutation.sh` | `pitest-maven` com `targetClasses` em `feature/*/domain` e `feature/*/service` (organização Feature-Based; em outra organização, ajuste `targetClasses` aos packages de negócio, com o mesmo threshold e com aprovação); propriedade `app.basePath` | SKIP ou FAIL |
 
 ## Passos
 
 Com os blocos prontos gerados pelo instalador, `bash scripts/quality/enable-gates.sh --dry-run` mostra o que mudaria e `--apply` executa os passos 1 a 4 e 6 (exige `app/` e `.harness` commitados, para revisar e desfazer). Sem banco no app, ele usa o teste de contexto sem Testcontainers e omite essas dependências. Os passos abaixo descrevem o mesmo trabalho feito à mão.
+
+O `--apply` localiza as seções pela estrutura do pom, fora de comentários: insere em `project/properties`, `project/dependencies` e `project/build/plugins`, nunca em `dependencyManagement`, `pluginManagement` ou `profiles`, e confere a boa formação do XML depois (com `xmllint` ou Python, se houver; senão, avisa). Ele **recusa, sem gravar nada**, quando: o app é multimódulo (`packaging` pom), um plugin do bloco já está declarado em `build/plugins` (surefire, failsafe, JaCoCo, PIT, dependency), uma propriedade do bloco já existe, ou uma seção está ausente, duplicada ou numa só linha. Dependências de teste já declaradas são omitidas do bloco. Nesses casos, aplique os blocos à mão, mesclando com a configuração existente. Com parent que não é o Spring Boot, as versões de surefire, failsafe e dependency-plugin precisam vir do parent ou de um BOM.
 
 1. **Propriedades** em `<properties>`: `app.basePackage`, `app.basePath` e `app.mainClass` (pacote e classe `@SpringBootApplication` do app), `skipUnitTests` (`false`), `argLine` vazia e as versões de JaCoCo, PIT e ArchUnit.
 2. **Plugins:** `maven-dependency-plugin` (execução `resolve-test-agent`, para o agent do Mockito), Surefire (`default-test` e `architecture`), Failsafe, JaCoCo e PIT, com as metas LINE ≥ 90%, BRANCH ≥ 90% e mutation score ≥ 90%.
@@ -26,4 +28,6 @@ Com os blocos prontos gerados pelo instalador, `bash scripts/quality/enable-gate
 6. Troque `QUALITY_GATES=optional` por `QUALITY_GATES=required` no `.harness`. A partir daí, um gate não configurado reprova o `verify.sh`.
 7. Verifique com `bash scripts/verify.sh` e `bash scripts/quality/mutation.sh`. A capacidade de rejeitar violações pode ser provada com `bash scripts/harness-tests/quality-gates.sh`.
 
-Mudanças no `app/pom.xml` são mudanças de build: exigem autorização, e as metas não podem ser reduzidas para obter aprovação (AGENTS.md, seção 6).
+Mudanças no `app/pom.xml` são mudanças de build: exigem autorização, e as metas não podem ser reduzidas para obter aprovação (AGENTS.md, seção 6). O `verify.sh` reprova redução ou desativação dos limites (`scripts/quality/check-thresholds.sh`).
+
+Multimódulo: o harness roda build e suítes agregados em `app/`, mas cobertura, mutação e arquitetura por módulo não são configuradas automaticamente. Configure-as no módulo da aplicação seguindo os blocos, e registre a estratégia no ADR-0003 ("Revisão neste projeto").

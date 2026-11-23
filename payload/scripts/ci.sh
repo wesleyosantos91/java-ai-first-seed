@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Ponto de entrada do harness para a CI (o workflow em .github/ é do time de DevOps e só chama
-# este script). Sem interação; o resultado vai para a saída e para um JSON estável.
+# Verificação completa local, não interativa, com contrato estável para quem a consome (inclusive
+# o pipeline do time de DevOps). NÃO é um pipeline: o kit não cria nem altera workflows, runners,
+# proteção de branch ou deploy; a orquestração e a governança da CI são do DevOps. O nome é mantido
+# por compatibilidade com quem já o chama. Contrato: docs/how-to/ci-integration.md.
 #
 # Uso: bash scripts/ci.sh
 # Etapas: verify.sh (agentes, build, unitários, arquitetura, integração, cobertura), mutação (PIT)
@@ -13,7 +15,8 @@ set -Eeuo pipefail
 #   CI_REQUIRE_COMPLETE=1  PARCIAL (alguma etapa SKIP ou NOT RUN) também falha a CI
 #   SKIP_INTEGRATION=1     repassado ao verify.sh (só com justificativa; resultado PARCIAL)
 # Resumo: <APP_DIR>/target/harness/ci-summary.json (formato em docs/how-to/ci-integration.md).
-# Retornos: 0 = PASS, ou PARCIAL sem CI_REQUIRE_COMPLETE; 1 = FAIL.
+# Retornos: 0 = PASS (ou PARCIAL com QUALITY_GATES=optional, com aviso); 3 = PARCIAL com
+#           QUALITY_GATES=required; 1 = FAIL, ou PARCIAL com CI_REQUIRE_COMPLETE=1.
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 ROOT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd -P)"
@@ -46,7 +49,8 @@ if [[ -z "${agents}" ]]; then
 fi
 
 mutation='NOT RUN'
-if [[ "${code}" == 0 && "${CI_MUTATION:-1}" == 1 ]]; then
+# verify.sh PARCIAL (exit 3) não é falha: a mutação ainda roda e entra no resultado agregado.
+if [[ "${code}" == 0 || "${code}" == 3 ]] && [[ "${CI_MUTATION:-1}" == 1 ]]; then
   echo "[CI] 2/3 Mutação (PIT)"
   code=0; bash "${SCRIPT_DIR}/quality/mutation.sh" || code=$?
   mutation="$(status_of "${code}")"
@@ -64,6 +68,14 @@ else
 fi
 
 result="$(summary_result "${agents}" "${build}" "${unit}" "${architecture}" "${integration}" "${coverage}" "${mutation}" "${secrets}")"
+case "${result}" in
+  PASS) SUMMARY_EXIT_CODE=0 ;;
+  PARCIAL)
+    if [[ "${CI_REQUIRE_COMPLETE:-0}" == 1 ]]; then SUMMARY_EXIT_CODE=1
+    elif [[ "${QUALITY_GATES}" == required ]]; then SUMMARY_EXIT_CODE=3
+    else SUMMARY_EXIT_CODE=0; fi ;;
+  *) SUMMARY_EXIT_CODE=1 ;;
+esac
 write_summary "${LOG_DIR}/ci-summary.json" "${result}" \
   "agents=${agents}" "build=${build}" "unit=${unit}" "architecture=${architecture}" \
   "integration=${integration}" "coverage=${coverage}" "mutation=${mutation}" "secrets=${secrets}"
@@ -75,6 +87,10 @@ case "${result}" in
     if [[ "${CI_REQUIRE_COMPLETE:-0}" == 1 ]]; then
       echo "[FAIL] CI: resultado PARCIAL com CI_REQUIRE_COMPLETE=1 (há etapas SKIP ou NOT RUN)." >&2; exit 1
     fi
-    echo "[PARCIAL] CI: há etapas SKIP ou NOT RUN; SKIP não equivale a PASS." ;;
+    echo "[PARCIAL] CI: há etapas SKIP ou NOT RUN; SKIP não equivale a PASS."
+    if [[ "${QUALITY_GATES}" == required ]]; then
+      echo "[PARCIAL] QUALITY_GATES=required: exit 3."; exit 3
+    fi
+    echo "[AVISO] QUALITY_GATES=optional: PARCIAL termina com exit 0 (adoção gradual)." ;;
   *) echo "[FAIL] CI: há etapas reprovadas." >&2; exit 1 ;;
 esac

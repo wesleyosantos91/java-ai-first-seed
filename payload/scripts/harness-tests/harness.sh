@@ -13,7 +13,7 @@ cp "${ROOT_DIR}/.gitleaks.toml" "${FIXTURE}/.gitleaks.toml"
 # pom.xml mínimo: as propriedades de pacote (lib/pom.sh) e os marcadores dos gates configurados
 # (lib/app.sh: sem eles, o gate é "não configurado").
 cat > "${FIXTURE}/pom.xml" <<'XML'
-<!-- <id>coverage-check</id> pitest-maven <id>architecture</id> maven-failsafe-plugin -->
+<!-- <id>coverage-check</id> pitest-maven <id>architecture</id> maven-failsafe-plugin testcontainers .feature.*.domain.* -->
 <project><properties>
 <app.basePackage>com.example.kitapp</app.basePackage>
 <app.basePath>com/example/kitapp</app.basePath>
@@ -116,20 +116,62 @@ check 1 'falhas nos relatórios' test/integration.sh MOCK_REPORT=error
 check 3 'execução incompleta' test/unit.sh MOCK_REPORT=skipped
 check 3 'execução incompleta' test/integration.sh MOCK_REPORT=partial
 check 1 'integração NOT RUN' test/integration.sh MOCK_DOCKER_EXIT=1
+# Sem Testcontainers no pom nem nos testes, a integração não exige Docker.
+sed -i 's/ testcontainers / /' "${FIXTURE}/pom.xml"
+check 0 '[PASS] Integração: 1' test/integration.sh MOCK_DOCKER_EXIT=1
+if grep -q docker "${FIXTURE_TRACE}"; then echo '[FAIL] Integração sem Testcontainers consultou o Docker.' >&2; exit 1; fi
+sed -i 's/maven-failsafe-plugin /maven-failsafe-plugin testcontainers /' "${FIXTURE}/pom.xml"
 
-check 0 'Agentes=PASS; Build=PASS; Unitários=PASS; Arquitetura=SKIP; Integração=PASS' verify.sh
+# Sem .harness, QUALITY_GATES=required: PARCIAL (alguma etapa SKIP) termina com exit 3.
+check 3 'Agentes=PASS; Build=PASS; Unitários=PASS; Arquitetura=SKIP; Integração=PASS' verify.sh
+grep -Fq 'QUALITY_GATES=required: resultado PARCIAL termina com exit 3' "${FIXTURE}/output"
 # Resumo JSON do verify.sh e ponto de entrada da CI (scripts/ci.sh).
 summary="${FIXTURE}/target/harness/verify-summary.json"
 grep -q '"result": "PARCIAL"' "${summary}"
 grep -q '"unit": "PASS"' "${summary}"
 grep -q '"architecture": "SKIP"' "${summary}"
 grep -q '"target/surefire-reports"' "${summary}"
-check 0 '[PARCIAL] CI: há etapas SKIP ou NOT RUN' ci.sh
+grep -q '"exit_code": 3' "${summary}"
+check 3 '[PARCIAL] CI: há etapas SKIP ou NOT RUN' ci.sh
 ci_summary="${FIXTURE}/target/harness/ci-summary.json"
 grep -q '"mutation": "SKIP"' "${ci_summary}"
 grep -q '"secrets": "PASS"' "${ci_summary}"
-check 0 'Mutação: NOT RUN (CI_MUTATION=0)' ci.sh CI_MUTATION=0 CI_SECRETS=0
+grep -q '"exit_code": 3' "${ci_summary}"
+check 3 'Mutação: NOT RUN (CI_MUTATION=0)' ci.sh CI_MUTATION=0 CI_SECRETS=0
 grep -q '"secrets": "NOT RUN"' "${ci_summary}"
+# Com QUALITY_GATES=optional (adoção gradual), PARCIAL termina com exit 0 e aviso.
+printf 'QUALITY_GATES=optional\n' > "${FIXTURE}/.harness"
+check 0 'QUALITY_GATES=optional: PARCIAL termina com exit 0' verify.sh
+grep -q '"result": "PARCIAL"' "${summary}"
+check 0 'QUALITY_GATES=optional: PARCIAL termina com exit 0' ci.sh CI_MUTATION=0 CI_SECRETS=0
+# MAVEN=system: mvn do PATH no lugar do Wrapper.
+cp "${FIXTURE}/mvnw" "${FIXTURE}/bin/mvn"; chmod +x "${FIXTURE}/bin/mvn"
+printf 'QUALITY_GATES=optional\nMAVEN=system\n' > "${FIXTURE}/.harness"
+mv "${FIXTURE}/mvnw" "${FIXTURE}/mvnw.off"
+check 0 '[PASS] Unitários: 1' test/unit.sh
+printf 'MAVEN=talvez\n' > "${FIXTURE}/.harness"
+check 1 "MAVEN 'talvez' inválido" test/unit.sh
+mv "${FIXTURE}/mvnw.off" "${FIXTURE}/mvnw"; rm -f "${FIXTURE}/bin/mvn" "${FIXTURE}/.harness"
+# Thresholds aprovados: redução no pom reprova a etapa de agentes do verify.sh.
+cp "${FIXTURE}/pom.xml" "${FIXTURE}/pom.xml.thr"
+cat > "${FIXTURE}/pom.xml" <<'XML'
+<project><properties><app.basePackage>com.example.kitapp</app.basePackage><app.basePath>com/example/kitapp</app.basePath><app.mainClass>KitMainApplication</app.mainClass></properties>
+<build><plugins>
+<plugin><artifactId>jacoco-maven-plugin</artifactId><executions><execution><id>coverage-check</id><configuration>
+<!-- <minimum>0.10</minimum> em comentário não conta -->
+<rules><rule><limits><limit><counter>LINE</counter><minimum>0.90</minimum></limit><limit><counter>BRANCH</counter><minimum>0.90</minimum></limit></limits></rule></rules>
+</configuration></execution></executions></plugin>
+<plugin><artifactId>pitest-maven</artifactId><configuration><mutationThreshold>90</mutationThreshold></configuration></plugin>
+</plugins></build></project>
+XML
+check 0 '[PASS] Limites de qualidade preservados' quality/check-thresholds.sh
+sed -i 's#<counter>BRANCH</counter><minimum>0.90#<counter>BRANCH</counter><minimum>0.80#' "${FIXTURE}/pom.xml"
+check 1 'JaCoCo <minimum> 0.80 abaixo de 0.90' quality/check-thresholds.sh
+check 1 'Agentes=FAIL; Build=NOT RUN' verify.sh
+sed -i 's#<minimum>0.80#<minimum>0.90#; s#<mutationThreshold>90#<mutationThreshold>75#' "${FIXTURE}/pom.xml"
+check 1 'PIT <mutationThreshold> 75 abaixo de 90' quality/check-thresholds.sh
+mv "${FIXTURE}/pom.xml.thr" "${FIXTURE}/pom.xml"
+check 3 'nada a proteger' quality/check-thresholds.sh
 check 1 'resultado PARCIAL com CI_REQUIRE_COMPLETE=1' ci.sh CI_MUTATION=0 CI_REQUIRE_COMPLETE=1
 check 1 '[FAIL] CI: há etapas reprovadas' ci.sh MOCK_BUILD_EXIT=7
 grep -q '"build": "FAIL"' "${ci_summary}"
@@ -142,12 +184,12 @@ if grep -q 'mvn' "${FIXTURE_TRACE}"; then
   echo '[FAIL] verify.sh executou Maven após falha da configuração de agentes.' >&2; exit 1
 fi
 check 1 'Build=PASS; Unitários=FAIL; Arquitetura=NOT RUN; Integração=NOT RUN' verify.sh MOCK_MAVEN_EXIT=7
-check 0 '[PARCIAL]' verify.sh SKIP_INTEGRATION=1
+check 3 '[PARCIAL]' verify.sh SKIP_INTEGRATION=1
 check 1 'SKIP_INTEGRATION deve ser 0 ou 1' verify.sh SKIP_INTEGRATION=invalid
 
 # Mover a classe de fixture para fora da convenção preserva seu conteúdo.
 mv "${FIXTURE}/src/test/java/ExampleTest.java" "${FIXTURE}/src/test/java/ExampleTest.fixture"
-check 0 'Build=PASS; Unitários=SKIP; Arquitetura=SKIP; Integração=PASS' verify.sh
+check 3 'Build=PASS; Unitários=SKIP; Arquitetura=SKIP; Integração=PASS' verify.sh
 grep -Fq '[PARCIAL]' "${FIXTURE}/output"
 
 # Quality gates sem código ou testes elegíveis: SKIP sem chamar Maven.
@@ -259,7 +301,7 @@ harness '# projeto' 'APP_DIR=app' 'QUALITY_GATES=required'
 check 0 '[PASS] Arquitetura: 1' test/architecture.sh
 grep -q 'surefire:test@architecture' "${FIXTURE_TRACE}"
 test -f "${FIXTURE}/app/target/architecture-reports/TEST-Fixture.xml"
-check 0 'Build=PASS; Unitários=SKIP; Arquitetura=PASS; Integração=PASS; Cobertura=PASS' verify.sh
+check 3 'Build=PASS; Unitários=SKIP; Arquitetura=PASS; Integração=PASS; Cobertura=PASS' verify.sh
 check 0 '[PASS] Mutação' quality/mutation.sh
 check 0 '[PASS] Performance' performance/smoke.sh
 grep -q -- '--summary-export app/target/performance/smoke-summary.json' "${FIXTURE_TRACE}"

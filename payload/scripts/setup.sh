@@ -14,11 +14,14 @@ echo "[INFO] Bash: ${BASH_VERSION}"
 echo "[INFO] Versão Java:"
 java_version="$(java -version 2>&1)"
 printf '%s\n' "${java_version}"
-# Java exigido: java.version do pom do app (AGENTS.md, seção 2). Inspeção apenas: diverge -> aviso.
-java_major="$(sed -n 's/.*version "\([0-9]*\).*/\1/p' <<<"${java_version}" | head -n 1)"
-java_required="$(sed -n 's#.*<java.version>\([0-9]*\)</java.version>.*#\1#p' pom.xml | head -n 1)"
+# Java exigido: o declarado no pom do app (lib/detect.sh: maven.compiler.release, compiler plugin ou
+# java.version; AGENTS.md, seção 2). Inspeção apenas: diverge -> aviso; nada é alterado.
+source "${SCRIPT_DIR}/lib/detect.sh"
+java_major="$(java_major "$(sed -n 's/.*version "\([0-9][0-9.]*\).*/\1/p' <<<"${java_version}" | head -n 1)")"
+detect_stack "${APP_ROOT}" || true
+java_required="${DETECT_JAVA}"
 if [[ -z "${java_required}" ]]; then
-  echo "[AVISO] java.version ausente em ${APP_PREFIX}pom.xml; versão exigida não verificada." >&2
+  echo "[AVISO] Java exigido não resolvido em ${APP_PREFIX}pom.xml (${DETECT_JAVA_SRC}); versão não verificada." >&2
 elif [[ "${java_major}" == "${java_required}" ]]; then
   echo "[OK] Java ${java_major}, conforme ${APP_PREFIX}pom.xml."
 elif [[ "${java_major}" =~ ^[0-9]+$ ]] && (( java_major > java_required )); then
@@ -26,8 +29,8 @@ elif [[ "${java_major}" =~ ^[0-9]+$ ]] && (( java_major > java_required )); then
 else
   echo "[AVISO] Java ${java_major:-desconhecido} no PATH; ${APP_PREFIX}pom.xml exige ${java_required}. Build e testes podem divergir." >&2
 fi
-echo "[INFO] Versão Maven resolvida pelo Wrapper:"
-bash ./mvnw --version
+echo "[INFO] Versão Maven ($([[ "${MAVEN}" == system ]] && echo 'mvn do PATH, MAVEN=system' || echo 'resolvida pelo Wrapper')):"
+run_maven --version
 
 # agents/check-config.sh usa python ou node para validar .claude/settings.json.
 json_tool=''

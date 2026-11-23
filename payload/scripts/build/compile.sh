@@ -10,5 +10,6 @@ require_maven_project || exit 1
 
 cd "${APP_ROOT}"
 echo "[INFO] Compilando ${APP_PREFIX:-./}pom.xml..."
-bash ./mvnw --batch-mode --no-transfer-progress clean compile
+[[ "${MAVEN}" == wrapper ]] || echo "[INFO] Maven do PATH (MAVEN=system): $(mvn --version 2>/dev/null | head -n 1)"
+run_maven --batch-mode --no-transfer-progress clean compile
 echo "[OK] Compilação concluída."
