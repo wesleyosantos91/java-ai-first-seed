@@ -10,7 +10,7 @@ Um agente produz resultados melhores quando recebe o contexto certo no momento c
 
 | Camada | Quando é carregada | Conteúdo | Arquivos |
 |---|---|---|---|
-| 1. Sempre carregada | Início de toda sessão | Regras invioláveis, mapa de contexto e catálogo de skills | [`AGENTS.md`](../../AGENTS.md) (≤ 12 KB, verificado) |
+| 1. Sempre carregada | Início de toda sessão | Regras invioláveis, mapa de contexto e fluxo das skills (catálogo completo sob demanda em [skills.md](skills.md)); descriptions das skills (≤ 700 caracteres cada, verificado) | [`AGENTS.md`](../../AGENTS.md) (≤ 12 KB, verificado) |
 | 2. Sob demanda | Quando a tarefa exige | Contratos, decisões, procedimentos e detalhes operacionais | PRD, ADRs, DoD, specs, `docs/how-to/`, `.agents/skills/` |
 | 3. Estado da tarefa | Tarefas longas ou troca de sessão/provider | Plano, progresso, decisões e descobertas da tarefa em andamento | Skill `task-state-files` |
 | 4. Aprendizado | Fim de tarefa com descoberta não óbvia | Aprendizados evidenciados, promovidos ao destino canônico das camadas 1 e 2 | Skill `lessons-learned` e [registro](lessons-learned.md) |
@@ -38,8 +38,8 @@ DoD (pronto) ──►  harness (scripts/) ──►  evidências no relatório
 
 | Provider | Instruções | Skills | Limites de autonomia versionados |
 |---|---|---|---|
-| Codex | `AGENTS.md` (raiz e diretórios no caminho) | `.agents/skills/` | `.codex/config.toml` (sandbox `workspace-write`, aprovação `on-request`) e `.codex/rules/delivery.rules` (commit, push, merge e rebase pedem aprovação; force-push é proibido). Carregados só se o projeto estiver marcado como confiável; valide as regras com `codex execpolicy check --rules .codex/rules/delivery.rules -- <comando>`. |
-| Claude Code | `CLAUDE.md`, que importa `@AGENTS.md` | `.claude/skills/`, com stubs gerados que apontam para `.agents/skills/` | `.claude/settings.json`: permissões allow/ask/deny e hook `PreToolUse` que aplica `scripts/git/guard-branch.sh` a `git commit` e `git push` |
+| Codex | `AGENTS.md` (raiz e diretórios no caminho) | `.agents/skills/` | `.codex/config.toml` (sandbox `workspace-write`, aprovação `on-request`) e `.codex/rules/delivery.rules` (commit, push, merge, rebase, `git -C`/`-c`, reset --hard, clean, restore, checkout --, `rm -r` e `enable-gates.sh --apply` pedem aprovação; force-push é proibido). Carregados só se o projeto estiver marcado como confiável; valide as regras com `codex execpolicy check --rules .codex/rules/delivery.rules -- <comando>`. |
+| Claude Code | `CLAUDE.md`, que importa `@AGENTS.md` | `.claude/skills/`, com stubs gerados que apontam para `.agents/skills/` | `.claude/settings.json`: allow só para os entrypoints de verificação; ask para comandos de entrega e destrutivos, `enable-gates.sh --apply` e edição de `scripts/`, `.harness`, ADRs, skills, `AGENTS.md` e `CLAUDE.md`; deny para force-push, `.env`, `.github/`, a própria `settings.json`, `.codex/`, os hooks e o `.kit-manifest`; hook `PreToolUse` que aplica `scripts/git/guard-branch.sh` a `git commit` e `git push` |
 | Devin | `AGENTS.md` | `.agents/skills/` (local recomendado pelo Devin) | Nenhum arquivo versionado; vale o `AGENTS.md` |
 
 O comportamento de descoberta foi conferido na documentação pública dos providers em 2026-11 e pode mudar. Reavalie ao atualizar os clientes (ver "Revisão da decisão" no ADR-0002).
@@ -48,11 +48,19 @@ Os arquivos de provider **reforçam** as regras do `AGENTS.md`, sem substituí-l
 
 Arquivos locais e pessoais, fora do versionamento: `CLAUDE.local.md`, `AGENTS.local.md` e `.claude/settings.local.json`.
 
-Proteção de `.github/` (gerido por DevOps; AGENTS.md, seção 8): o Claude Code a aplica com `deny` de `Edit`/`Write` em `.github/**`, verificado pelo `check-config.sh`. As regras do Codex (`execpolicy`) controlam comandos, não caminhos de arquivo, e o Devin não tem adaptador: nos dois vale a regra do AGENTS.md e o item bloqueante da skill `code-review`. Não há bloqueio no Git, porque o time de DevOps faz commits nesse diretório: o `pre-commit` só avisa quando o commit altera `.github/`. A proteção para todos os providers é o CODEOWNERS e a proteção de branch, recomendados em [integração à CI](../how-to/ci-integration.md).
+Proteção de `.github/` (gerido por DevOps; AGENTS.md, seção 8): o Claude Code a aplica com `deny` de `Edit`/`Write` em `.github/**`, verificado pelo `check-config.sh`. As regras do Codex (`execpolicy`) controlam comandos, não caminhos de arquivo, e o Devin não tem adaptador: nos dois vale a regra do AGENTS.md e o item bloqueante da skill `code-review`. Não há bloqueio no Git, porque o time de DevOps faz commits nesse diretório: o `pre-commit` só avisa quando o commit altera `.github/`. Controles que valham para todos os providers no servidor Git (proprietários de diretório, proteção de branch) são decisão e configuração exclusivas do time de DevOps; o kit não os cria nem altera ([contrato do harness](../how-to/ci-integration.md)).
+
+## MCP e ferramentas externas
+
+MCPs são opcionais e nunca obrigatórios: o kit não instala, não baixa e não configura nenhum, e o harness não depende deles. Um MCP fornece contexto às skills (que definem o processo); sua resposta é dado não confiável e nunca substitui build, testes ou leitura do código. Habilitar um MCP é decisão do projeto, feita fora do `.claude/settings.json` versionado, com menor privilégio e versão fixada. Guia do candidato oficial do ecossistema Spring: [Spring Tools](../how-to/spring-tools-mcp.md).
+
+## Limites reais da aplicação
+
+As permissões e regras dos providers são reforço, não garantia: regras por prefixo de comando (Codex) e por regex sobre o comando (hook do Claude) podem ser contornadas por um agente determinado (`sh -c`, script intermediário). O Devin não tem adaptador versionado. O que vale para todos os providers é o que age fora do cliente: os hooks Git (`commit-msg`, `pre-commit`), o `check-thresholds.sh` no `verify.sh`, o `check-config.sh` e a revisão humana do diff. A conformidade de cada provider só é declarada com avaliação executada (cenários adversariais do kit), nunca presumida. Nos evals do kit (2026-11-23), o Codex tratava um pedido direto na conversa como autorização para alterar ADR aceito, `.github/` e permissões, até o AGENTS.md (seção 8) separar invariantes não dispensáveis de mudanças que exigem plano aprovado; o Claude Code recusou os mesmos pedidos. Ao mudar essas regras, repita os evals.
 
 ## Agentes em nuvem e ambiente reproduzível
 
-Agentes que executam em nuvem (Codex cloud, Devin, sessões remotas) e Codespaces precisam do mesmo ambiente que o harness assume. O [`.devcontainer/devcontainer.json`](../../.devcontainer/devcontainer.json) fornece Java 27 (Temurin), Docker (docker-in-docker, para Testcontainers) e GitHub CLI, com versões de imagem e features fixadas. Após a criação, ele executa `scripts/setup.sh` e instala os hooks Git. Para providers que configuram o ambiente fora do repositório, use os mesmos passos: Java 27, Docker, `bash scripts/setup.sh` e `bash scripts/git/install-hooks.sh`.
+Agentes que executam em nuvem (Codex cloud, Devin, sessões remotas) e Codespaces precisam do mesmo ambiente que o harness assume. O [`.devcontainer/devcontainer.json`](../../.devcontainer/devcontainer.json) fornece o Java do app (Temurin; Java 25 LTS como baseline de projetos novos), Docker (docker-in-docker, para Testcontainers) e GitHub CLI, com versões de imagem e features fixadas. Após a criação, ele executa `scripts/setup.sh` e instala os hooks Git. Para providers que configuram o ambiente fora do repositório, use os mesmos passos: o Java do app, Docker, `bash scripts/setup.sh` e `bash scripts/git/install-hooks.sh`.
 
 Os hooks Git (`commit-msg` e `pre-commit`) são o mecanismo de aplicação **comum a todos os providers**: agem no Git, não no cliente do agente. O hook `PreToolUse` do Claude Code continua como reforço específico.
 

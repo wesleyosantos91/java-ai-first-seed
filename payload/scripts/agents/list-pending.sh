@@ -10,7 +10,8 @@ set -Eeuo pipefail
 # Retornos: 0 = PASS, nada a preencher; 3 = SKIP, há campos pendentes (listados).
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-ROOT_DIR="$(cd -- "${SCRIPT_DIR}/../.." && pwd -P)"
+# HARNESS_ROOT_DIR (opcional): lista outra raiz com esta cópia do script (instalador do kit).
+ROOT_DIR="$(cd -- "${HARNESS_ROOT_DIR:-${SCRIPT_DIR}/../..}" && pwd -P)"
 cd -- "${ROOT_DIR}"
 
 files=()

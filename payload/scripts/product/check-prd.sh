@@ -10,7 +10,8 @@ set -Eeuo pipefail
 #           1 = FAIL, Status Aprovado com pendências ou sem critério de aceitação (### CA-NN).
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-ROOT_DIR="$(cd -- "${SCRIPT_DIR}/../.." && pwd -P)"
+# HARNESS_ROOT_DIR (opcional): verifica outra raiz com esta cópia do script (instalador do kit).
+ROOT_DIR="$(cd -- "${HARNESS_ROOT_DIR:-${SCRIPT_DIR}/../..}" && pwd -P)"
 prd="${1:-${ROOT_DIR}/docs/product/prd.md}"
 (( $# <= 1 )) || { echo "Uso: bash scripts/product/check-prd.sh [arquivo]" >&2; exit 1; }
 

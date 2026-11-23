@@ -78,12 +78,12 @@ fresh
 sed -i 's/^name: tdd-workflow$/name: tdd/' "${f}/.agents/skills/tdd-workflow/SKILL.md"
 check 1 "name 'tdd' difere do diretório 'tdd-workflow'" "${f}" agents/check-config.sh
 
-# Skill fora do catálogo do AGENTS.md (com stub sincronizado, para isolar a regra).
+# Skill fora do catálogo (docs/ai/skills.md), com stub sincronizado, para isolar a regra.
 fresh
 cp -R "${f}/.agents/skills/code-review" "${f}/.agents/skills/new-skill"
 sed -i 's/^name: code-review$/name: new-skill/' "${f}/.agents/skills/new-skill/SKILL.md"
 (cd "${f}" && bash scripts/agents/sync-skills.sh >/dev/null)
-check 1 'Skills ausentes do catálogo do AGENTS.md: new-skill' "${f}" agents/check-config.sh
+check 1 'Skills ausentes do catálogo (docs/ai/skills.md): new-skill' "${f}" agents/check-config.sh
 
 # CLAUDE.md sem import do AGENTS.md.
 fresh
