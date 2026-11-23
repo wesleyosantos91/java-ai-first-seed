@@ -1,0 +1,22 @@
+<project>
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>4.1.2</version>
+	</parent>
+	<artifactId>catalog</artifactId>
+	<dependencies>
+		<dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-data-jdbc</artifactId></dependency>
+	</dependencies>
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<release>25</release>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+</project>

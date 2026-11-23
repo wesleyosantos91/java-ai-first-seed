@@ -1,0 +1,6 @@
+<project>
+	<groupId>com.acme</groupId>
+	<artifactId>orders-service</artifactId>
+	<version>1.0.0</version>
+	<properties><maven.compiler.release>25</maven.compiler.release></properties>
+</project>
